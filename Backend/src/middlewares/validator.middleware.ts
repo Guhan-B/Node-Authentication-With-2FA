@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import Joi from "joi";
 
-import { Errors, E } from "../utilities/error.js";
+import { ServerError, E } from "../utilities/error.js";
 import requestSchemas from "../utilities/request.js";
 
 const handler = (): RequestHandler => (request, response, next) => {
@@ -17,10 +17,10 @@ const handler = (): RequestHandler => (request, response, next) => {
         } else {
             const errors: Array<E> = validationResult.error.details.map((detail) => ({
                 cause: detail.path.join("."),
-                message: detail.message,
+                message: detail.message
             }));
 
-            next(Errors.VALIDATION_ERROR(errors));
+            next(new ServerError("VALIDATION_ERROR", errors));
         }
     }
 };

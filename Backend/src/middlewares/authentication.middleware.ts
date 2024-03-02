@@ -4,7 +4,7 @@ import { jwtDecode, InvalidTokenError, JwtPayload } from "jwt-decode";
 import { RequestHandler } from "express";
 
 import prisma from "../utilities/prisma.js";
-import { Errors } from "../utilities/error.js";
+import { ServerError } from "../utilities/error.js";
 
 /**
  * Creating a custom type CustomJwtPayload on top of exisitng
@@ -21,40 +21,31 @@ const handler = (): RequestHandler => async (request, response, next) => {
         const accessToken: string = request.cookies["access-token"];
 
         if (!accessToken) {
-            throw Errors.AUTHETICATION_ERROR([
-                {
-                    cause: "Access token missing",
-                    message: "Authentication failed. Login to continue",
-                },
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Access token missing", message: "Authentication failed. Login to continue" }
             ]);
         }
 
         const payload: CustomJwtPayload = jwtDecode(accessToken);
 
         const userFromDB = await prisma.user.findUnique({
-            where: { id: payload.uid },
+            where: { id: payload.uid }
         });
         const sessionFromDB = await prisma.session.findUnique({
-            where: { id: payload.tid },
+            where: { id: payload.tid }
         });
 
         if (!userFromDB || !sessionFromDB) {
-            throw Errors.AUTHETICATION_ERROR([
-                {
-                    cause: "Invalid access token",
-                    message: "Authentication failed. Login to continue",
-                },
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
             ]);
         }
 
         jwt.verify(accessToken, process.env.TOKEN_SECRET_KEY + userFromDB.password, async (error) => {
             if (error) {
                 next(
-                    Errors.AUTHETICATION_ERROR([
-                        {
-                            cause: "Invalid access token",
-                            message: "Authentication failed. Login to continue",
-                        },
+                    new ServerError("AUTHETICATION_ERROR", [
+                        { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
                     ])
                 ); // Not throwing here because the error is not reaching catch
             } else {
@@ -62,13 +53,10 @@ const handler = (): RequestHandler => async (request, response, next) => {
 
                 if (!isTokenSame) {
                     next(
-                        Errors.AUTHETICATION_ERROR([
-                            {
-                                cause: "Invalid access token",
-                                message: "Authentication failed. Login to continue",
-                            },
+                        new ServerError("AUTHETICATION_ERROR", [
+                            { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
                         ])
-                    );
+                    ); // Not throwing here because the error is not reaching catch
                 }
 
                 request.uid = userFromDB.id;
@@ -78,11 +66,8 @@ const handler = (): RequestHandler => async (request, response, next) => {
         });
     } catch (e) {
         if (e instanceof InvalidTokenError) {
-            e = Errors.AUTHETICATION_ERROR([
-                {
-                    cause: "Invalid access token",
-                    message: "Authentication failed. Login to continue",
-                },
+            e = new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
             ]);
         }
 

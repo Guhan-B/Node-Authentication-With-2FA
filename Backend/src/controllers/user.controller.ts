@@ -11,7 +11,7 @@ const fetchProfile: RequestHandler = async (request, response, next) => {
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                avatar: user.avatar,
+                avatar: user.avatar
             });
         } else {
             response.status(404).json();
@@ -25,5 +25,5 @@ const editProfile: RequestHandler = async (request, response, next) => {};
 
 export default {
     fetchProfile,
-    editProfile,
+    editProfile
 };

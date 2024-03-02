@@ -4,13 +4,13 @@ module.exports = {
     parser: "@typescript-eslint/parser",
     parserOptions: {
         project: ["./tsconfig.json"],
-        tsconfigRootDir: __dirname,
+        tsconfigRootDir: __dirname
     },
     root: true,
     overrides: [
         {
             extends: ["plugin:@typescript-eslint/disable-type-checked"],
-            files: ["./**/*.cjs"],
-        },
-    ],
+            files: ["./**/*.cjs"]
+        }
+    ]
 };

@@ -3,21 +3,18 @@ import bcrypt from "bcrypt";
 import { RequestHandler } from "express";
 
 import prisma from "../utilities/prisma.js";
-import { Errors } from "../utilities/error.js";
+import { ServerError } from "../utilities/error.js";
 import { generateToken } from "../utilities/token.js";
 
 const register: RequestHandler = async (request, response, next) => {
     try {
         const user = await prisma.user.findUnique({
-            where: { email: request.body.email },
+            where: { email: request.body.email }
         });
 
         if (user) {
-            throw Errors.VALIDATION_ERROR([
-                {
-                    cause: "email",
-                    message: "An account with given email already exists",
-                },
+            throw new ServerError("VALIDATION_ERROR", [
+                { cause: "email", message: "An account with given email already exists" }
             ]);
         }
 
@@ -31,7 +28,7 @@ const register: RequestHandler = async (request, response, next) => {
                 password: hash,
                 avatar: request.body.avatar,
                 created_at: new Date().toUTCString()
-            },
+            }
         });
 
         response.status(201).json();
@@ -43,32 +40,31 @@ const register: RequestHandler = async (request, response, next) => {
 const login: RequestHandler = async (request, response, next) => {
     try {
         const user = await prisma.user.findUnique({
-            where: { email: request.body.email },
+            where: { email: request.body.email }
         });
 
         if (!user) {
-            throw Errors.VALIDATION_ERROR([
-                {
-                    cause: "email",
-                    message: "An account with given email does not exists",
-                },
+            throw new ServerError("VALIDATION_ERROR", [
+                { cause: "email", message: "An account with given email does not exists" }
             ]);
         }
 
         if (user.verified !== 1) {
-            throw Errors.ACCESS_FORBIDDEN_ERROR([{ cause: "email", message: "Email address is not verified" }]);
+            throw new ServerError("ACCESS_FORBIDDEN_ERROR", [
+                { cause: "email", message: "Email address is not verified" }
+            ]);
         }
 
         const isPasswordSame: boolean = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
-            throw Errors.VALIDATION_ERROR([{ cause: "password", message: "Password is incorrect" }]);
+            throw new ServerError("VALIDATION_ERROR", [{ cause: "password", message: "Password is incorrect" }]);
         }
 
         const tokenPayload = {
             tid: uuid.v4(),
             uid: user.id,
-            createdAt: new Date().toUTCString(),
+            createdAt: new Date().toUTCString()
         };
         const { token, tokenHash } = await generateToken(
             tokenPayload,
@@ -81,14 +77,14 @@ const login: RequestHandler = async (request, response, next) => {
                 id: tokenPayload.tid,
                 user_id: user.id,
                 created_at: tokenPayload.createdAt,
-                token: tokenHash,
-            },
+                token: tokenHash
+            }
         });
 
         response.cookie("access-token", token, {
             maxAge: 7 * 24 * 60 * 60 * 1000,
             httpOnly: true,
-            secure: false, // if secure: true cookie works only on secure channel i.e HTTPS
+            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
         });
         response.status(201).json();
     } catch (e) {
@@ -113,5 +109,5 @@ export default {
     login,
     logout,
     resetPassword,
-    verify,
+    verify
 };

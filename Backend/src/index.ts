@@ -12,9 +12,7 @@ import validatorMiddelware from "./middlewares/validator.middleware.js";
 dotenv.config();
 
 /**
- * Creating a custom type CustomJwtPayload on top of exisitng
- * type JwtPayload (from jwt-decode module) to support tid
- * (Token ID) & uid (User ID) in the token payload
+ *
  */
 declare global {
     namespace Express {

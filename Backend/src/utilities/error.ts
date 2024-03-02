@@ -5,28 +5,28 @@ export type E = {
     message: string;
 };
 
+export type ErrorCode = "INTERNAL_SERVER_ERROR" | "ACCESS_FORBIDDEN_ERROR" | "AUTHETICATION_ERROR" | "VALIDATION_ERROR";
+
+const errorCodetoStatus: Map<ErrorCode, number> = new Map<ErrorCode, number>();
+
+errorCodetoStatus.set("INTERNAL_SERVER_ERROR", 500);
+errorCodetoStatus.set("ACCESS_FORBIDDEN_ERROR", 403);
+errorCodetoStatus.set("AUTHETICATION_ERROR", 401);
+errorCodetoStatus.set("VALIDATION_ERROR", 400);
 export class ServerError extends Error {
     public readonly _id: string;
-    public readonly code: string;
+    public readonly code: ErrorCode;
     public readonly status: number;
     public readonly errors: Array<E>;
 
-    constructor(code: string, status: number, errors: Array<E>) {
+    constructor(code: ErrorCode, errors: Array<E>) {
         super();
-
         this._id = uuid.v4();
         this.code = code;
-        this.status = status;
+        this.status = errorCodetoStatus.get(this.code) || 500;
         this.errors = errors;
     }
 }
-
-export const Errors = {
-    INTERNAL_SERVER_ERROR: (errors: Array<E>) => new ServerError("INTERNAL_SERVER_ERROR", 500, errors),
-    ACCESS_FORBIDDEN_ERROR: (errors: Array<E>) => new ServerError("ACCESS_FORBIDDEN_ERROR", 403, errors),
-    AUTHETICATION_ERROR: (errors: Array<E>) => new ServerError("AUTHETICATION_ERROR", 401, errors),
-    VALIDATION_ERROR: (errors: Array<E>) => new ServerError("VALIDATION_ERROR", 400, errors),
-};
 
 // 500 - Internal Server Error
 // 403 - Forbidden

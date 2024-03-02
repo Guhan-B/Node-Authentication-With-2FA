@@ -3,7 +3,7 @@ import { pino, Logger } from "pino";
 const logger: Logger = pino({
     level: process.env.LOG_LEVEL || "info",
     transport: {
-        target: "pino-pretty", // To make the JSON logs pretty & readable
+        target: "pino-pretty" // To make the JSON logs pretty & readable
     },
     formatters: {
         level: (label, number) => {
@@ -11,19 +11,19 @@ const logger: Logger = pino({
         },
         bindings: (bindings) => {
             return { processID: bindings.pid };
-        },
+        }
     },
     timestamp: () => {
         const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
             dateStyle: "long",
             timeStyle: "long",
-            timeZone: process.env.LOG_TIMEZONE || "UTC",
+            timeZone: process.env.LOG_TIMEZONE || "UTC"
         });
 
         return `,"time":"${dateTimeFormatter.format(Date.now())}"`;
     },
     messageKey: "message",
-    errorKey: "error",
+    errorKey: "error"
 });
 
 export default logger;
