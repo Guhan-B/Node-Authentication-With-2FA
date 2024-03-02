@@ -1,0 +1,46 @@
+import express from "express";
+import dotenv from "dotenv";
+import helmet from "helmet";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+
+import logger from "./utilities/logger.js";
+import router from "./routes/index.js";
+import errorMiddelware from "./middlewares/error.middleware.js";
+import validatorMiddelware from "./middlewares/validator.middleware.js";
+
+dotenv.config();
+
+/**
+ * Creating a custom type CustomJwtPayload on top of exisitng
+ * type JwtPayload (from jwt-decode module) to support tid
+ * (Token ID) & uid (User ID) in the token payload
+ */
+declare global {
+    namespace Express {
+        export interface Request {
+            uid?: string;
+        }
+    }
+}
+
+const server = () => {
+    const app = express();
+
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    app.use(cookieParser());
+    app.use(validatorMiddelware());
+
+    app.use("/", router);
+
+    app.use(errorMiddelware());
+
+    const PORT = process.env.PORT || 8000;
+
+    app.listen(PORT, () => {
+        logger.info(`Server is started and is running on port ${PORT}`);
+    });
+};
+
+server();
