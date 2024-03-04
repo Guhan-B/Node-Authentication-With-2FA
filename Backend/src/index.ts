@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { JwtPayload } from "jwt-decode";
 
 import logger from "./utilities/logger.js";
 import router from "./routes/index.js";
@@ -10,16 +11,18 @@ import errorMiddelware from "./middlewares/error.middleware.js";
 import validatorMiddelware from "./middlewares/validator.middleware.js";
 
 dotenv.config();
-
-/**
- *
- */
 declare global {
     namespace Express {
         export interface Request {
             uid?: string;
         }
     }
+
+    type CustomJwtPayload = JwtPayload & {
+        tid?: string;
+        uid: string;
+        createdAt?: string;
+    };
 }
 
 const server = () => {

@@ -32,9 +32,18 @@ const LOGIN_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     })
 });
 
-const requestSchemas: Map<string, Joi.ObjectSchema<any>> = new Map<string, Joi.ObjectSchema<any>>();
+const VERIFY_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
+    otp: Joi.number().min(1000).max(9999).messages({
+        "any.required": "Field is required",
+        "number.min": "Invalid OTP",
+        "number.max": "Invalid OTP"
+    })
+});
 
-requestSchemas.set("/authentication/register", REGISTER_USER_REQUEST_SCHEMA);
-requestSchemas.set("/authentication/login", LOGIN_USER_REQUEST_SCHEMA);
+const RequestSchemas: Map<string, Joi.ObjectSchema<any>> = new Map<string, Joi.ObjectSchema<any>>();
 
-export default requestSchemas;
+RequestSchemas.set("POST:/authentication/register", REGISTER_USER_REQUEST_SCHEMA);
+RequestSchemas.set("POST:/authentication/login", LOGIN_USER_REQUEST_SCHEMA);
+RequestSchemas.set("POST:/authentication/login/verify", VERIFY_USER_REQUEST_SCHEMA);
+
+export default RequestSchemas;

@@ -2,10 +2,10 @@ import { RequestHandler } from "express";
 import Joi from "joi";
 
 import { ServerError, E } from "../utilities/error.js";
-import requestSchemas from "../utilities/request.js";
+import RequestSchemas from "../utilities/request.js";
 
 const handler = (): RequestHandler => (request, response, next) => {
-    const schema: Joi.ObjectSchema<any> | undefined = requestSchemas.get(request.url);
+    const schema: Joi.ObjectSchema<any> | undefined = RequestSchemas.get(request.method + ":" + request.url);
 
     if (schema === undefined) {
         next();

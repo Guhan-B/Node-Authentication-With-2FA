@@ -6,10 +6,12 @@ import AuthenticationController from "../controllers/authentication.controller.j
 const router = Router();
 
 // Register the endpoints
+router.get("/login/verify", AuthenticationController.generateOTP);
+
 router.post("/register", AuthenticationController.register);
 router.post("/login", AuthenticationController.login);
+router.post("/login/verify", AuthenticationController.verifyOTP);
 router.post("/logout", AuthenticationController.logout);
 router.post("/reset-password", AuthenticationController.resetPassword);
-router.post("/verify", AuthenticationController.verify);
 
 export default router;

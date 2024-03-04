@@ -6,42 +6,38 @@ import { RequestHandler } from "express";
 import prisma from "../utilities/prisma.js";
 import { ServerError } from "../utilities/error.js";
 
-/**
- * Creating a custom type CustomJwtPayload on top of exisitng
- * type JwtPayload (from jwt-decode module) to support tid
- * (Token ID) & uid (User ID) in the token payload
- */
-type CustomJwtPayload = JwtPayload & {
-    tid: string;
-    uid: string;
-};
-
 const handler = (): RequestHandler => async (request, response, next) => {
     try {
-        const accessToken: string = request.cookies["access-token"];
+        const tokenFromCookie: string = request.cookies["access-token"];
 
-        if (!accessToken) {
+        if (!tokenFromCookie) {
             throw new ServerError("AUTHETICATION_ERROR", [
                 { cause: "Access token missing", message: "Authentication failed. Login to continue" }
             ]);
         }
 
-        const payload: CustomJwtPayload = jwtDecode(accessToken);
+        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
 
-        const userFromDB = await prisma.user.findUnique({
-            where: { id: payload.uid }
-        });
-        const sessionFromDB = await prisma.session.findUnique({
-            where: { id: payload.tid }
-        });
-
-        if (!userFromDB || !sessionFromDB) {
+        if (!payload.tid) {
             throw new ServerError("AUTHETICATION_ERROR", [
                 { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
             ]);
         }
 
-        jwt.verify(accessToken, process.env.TOKEN_SECRET_KEY + userFromDB.password, async (error) => {
+        const user = await prisma.user.findUnique({
+            where: { id: payload.uid }
+        });
+        const session = await prisma.session.findUnique({
+            where: { id: payload.tid }
+        });
+
+        if (!user || !session) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
+            ]);
+        }
+
+        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password, async (error) => {
             if (error) {
                 next(
                     new ServerError("AUTHETICATION_ERROR", [
@@ -49,7 +45,7 @@ const handler = (): RequestHandler => async (request, response, next) => {
                     ])
                 ); // Not throwing here because the error is not reaching catch
             } else {
-                const isTokenSame = await bcrypt.compare(accessToken, sessionFromDB.token);
+                const isTokenSame = await bcrypt.compare(tokenFromCookie, session.token);
 
                 if (!isTokenSame) {
                     next(
@@ -59,7 +55,7 @@ const handler = (): RequestHandler => async (request, response, next) => {
                     ); // Not throwing here because the error is not reaching catch
                 }
 
-                request.uid = userFromDB.id;
+                request.uid = user.id;
 
                 next();
             }

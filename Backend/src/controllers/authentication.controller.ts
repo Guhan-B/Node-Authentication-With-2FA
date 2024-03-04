@@ -1,10 +1,14 @@
-import * as uuid from "uuid";
 import bcrypt from "bcrypt";
+import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
+import { v4 } from "uuid";
 import { RequestHandler } from "express";
+import { jwtDecode, InvalidTokenError } from "jwt-decode";
 
 import prisma from "../utilities/prisma.js";
 import { ServerError } from "../utilities/error.js";
-import { generateToken } from "../utilities/token.js";
+
+const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 const register: RequestHandler = async (request, response, next) => {
     try {
@@ -22,7 +26,7 @@ const register: RequestHandler = async (request, response, next) => {
 
         await prisma.user.create({
             data: {
-                id: uuid.v4(),
+                id: v4(),
                 name: request.body.name,
                 email: request.body.email,
                 password: hash,
@@ -49,12 +53,6 @@ const login: RequestHandler = async (request, response, next) => {
             ]);
         }
 
-        if (user.verified !== 1) {
-            throw new ServerError("ACCESS_FORBIDDEN_ERROR", [
-                { cause: "email", message: "Email address is not verified" }
-            ]);
-        }
-
         const isPasswordSame: boolean = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
@@ -62,33 +60,214 @@ const login: RequestHandler = async (request, response, next) => {
         }
 
         const tokenPayload = {
-            tid: uuid.v4(),
+            uid: user.id
+        } satisfies CustomJwtPayload;
+
+        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
+            expiresIn: "1m",
+            algorithm: "HS256",
+            header: {
+                typ: "2FA-JWT",
+                alg: "HS256"
+            }
+        });
+
+        response.cookie("2FA-token", token, {
+            maxAge: 1 * 60 * 1000,
+            httpOnly: true,
+            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
+        });
+
+        response.status(201).json();
+    } catch (e) {
+        return next(e);
+    }
+};
+
+const generateOTP: RequestHandler = async (request, response, next) => {
+    try {
+        const tokenFromCookie: string = request.cookies["2FA-token"];
+
+        if (!tokenFromCookie) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "2FA token missing", message: "Unable to generate OTP. Please login again" }
+            ]);
+        }
+
+        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
+
+        const user = await prisma.user.findUnique({
+            where: { id: payload.uid }
+        });
+
+        if (!user) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
+            ]);
+        }
+
+        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
+
+        const OTP: number = Math.floor(Math.random() * (9999 - 1000) + 1000);
+
+        const tokenPayload = {
+            tid: v4(),
             uid: user.id,
             createdAt: new Date().toUTCString()
-        };
-        const { token, tokenHash } = await generateToken(
-            tokenPayload,
-            process.env.TOKEN_SECRET_KEY + user.password,
-            "7d"
-        );
+        } satisfies CustomJwtPayload;
+
+        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
+            expiresIn: "1h",
+            algorithm: "HS256",
+            header: {
+                typ: "2FA-JWT",
+                alg: "HS256"
+            }
+        });
+
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+        await prisma.verification.create({
+            data: {
+                id: tokenPayload.tid,
+                user_id: user.id,
+                token: tokenHash,
+                otp: OTP,
+                created_at: tokenPayload.createdAt
+            }
+        });
+
+        response.clearCookie("2FA-token");
+
+        response.cookie("2FA-token", token, {
+            maxAge: 1 * 60 * 60 * 1000,
+            httpOnly: true,
+            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
+        });
+
+        response.status(201).json();
+    } catch (e) {
+        if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
+            e = new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
+            ]);
+        }
+
+        next(e);
+    }
+};
+
+const verifyOTP: RequestHandler = async (request, response, next) => {
+    try {
+        const tokenFromCookie: string = request.cookies["2FA-token"];
+
+        if (!tokenFromCookie) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "2FA token missing", message: "Unable to verify OTP. Please login again" }
+            ]);
+        }
+
+        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
+
+        if (!payload.tid) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
+            ]);
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: payload.uid }
+        });
+        const session = await prisma.verification.findUnique({
+            where: { id: payload.tid }
+        });
+
+        if (!user || !session) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
+            ]);
+        }
+
+        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
+
+        if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
+            ]);
+        }
+
+        if (Number.parseInt(request.body.otp) !== session.otp) {
+            throw new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid OTP", message: "Incorrect OTP entered. Please try again" }
+            ]);
+        }
+
+        await prisma.verification.delete({
+            where: {
+                id: payload.tid
+            }
+        });
+
+        if (user.verified === 0) {
+            await prisma.user.update({
+                where: {
+                    id: user.id
+                },
+                data: {
+                    verified: 1
+                }
+            });
+        }
+
+        const tokenPayload = {
+            tid: v4(),
+            uid: user.id,
+            createdAt: new Date().toUTCString()
+        } satisfies CustomJwtPayload;
+
+        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
+            expiresIn: "7d",
+            algorithm: "HS256",
+            header: {
+                typ: "Access-JWT",
+                alg: "HS256"
+            }
+        });
+
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
         await prisma.session.create({
             data: {
                 id: tokenPayload.tid,
                 user_id: user.id,
-                created_at: tokenPayload.createdAt,
-                token: tokenHash
+                token: tokenHash,
+                created_at: tokenPayload.createdAt
             }
         });
+
+        response.clearCookie("2FA-token");
 
         response.cookie("access-token", token, {
             maxAge: 7 * 24 * 60 * 60 * 1000,
             httpOnly: true,
             secure: false // if secure: true cookie works only on secure channel i.e HTTPS
         });
+
         response.status(201).json();
     } catch (e) {
-        return next(e);
+        if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
+            e = new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
+            ]);
+        }
+
+        if (e instanceof TokenExpiredError) {
+            e = new ServerError("AUTHETICATION_ERROR", [
+                { cause: "Expired 2FA token", message: "OTP Expired. Please login again" }
+            ]);
+        }
+
+        next(e);
     }
 };
 
@@ -100,14 +279,11 @@ const resetPassword: RequestHandler = async (request, response, next) => {
     console.log(request.body);
 };
 
-const verify: RequestHandler = async (request, response, next) => {
-    console.log(request.body);
-};
-
 export default {
     register,
     login,
     logout,
     resetPassword,
-    verify
+    generateOTP,
+    verifyOTP
 };
