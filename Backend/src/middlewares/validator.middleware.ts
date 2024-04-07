@@ -1,8 +1,8 @@
 import { RequestHandler } from "express";
 import Joi from "joi";
 
-import { ServerError, E } from "../utilities/error.js";
-import RequestSchemas from "../utilities/request.js";
+import { ServerError } from "../utilities/error.js";
+import RequestSchemas from "../utilities/requestSchema.js";
 
 const handler = (): RequestHandler => (request, response, next) => {
     const schema: Joi.ObjectSchema<any> | undefined = RequestSchemas.get(request.method + ":" + request.url);
@@ -15,12 +15,12 @@ const handler = (): RequestHandler => (request, response, next) => {
         if (validationResult.error === undefined) {
             next();
         } else {
-            const errors: Array<E> = validationResult.error.details.map((detail) => ({
+            const errors = validationResult.error.details.map((detail) => ({
                 cause: detail.path.join("."),
                 message: detail.message
             }));
 
-            next(new ServerError("VALIDATION_ERROR", errors));
+            next(ServerError.ValidationError(errors));
         }
     }
 };

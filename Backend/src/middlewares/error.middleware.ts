@@ -8,7 +8,7 @@ const handler = (): ErrorRequestHandler => (error, request, response, next) => {
         logger.error(error);
     } else {
         logger.fatal(error);
-        error = new ServerError("INTERNAL_SERVER_ERROR", []);
+        error = ServerError.InternalServerError([]);
     }
     return response.status(error.status).json({ error });
 };

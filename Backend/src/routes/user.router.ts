@@ -1,12 +1,12 @@
 import { Router } from "express";
 
-import UserController from "../controllers/user.controller.js";
+import { userController } from "../controllers/index.js";
 
 // Create a new Router instance
 const router = Router();
 
 // Register the endpoints
-router.get("/profile", UserController.fetchProfile);
-router.post("/profile", UserController.editProfile);
+router.get("/profile", userController.fetchProfile);
+router.post("/profile", userController.editProfile);
 
 export default router;

@@ -1,32 +1,49 @@
-import { pino, Logger } from "pino";
+import dotenv from "dotenv";
+import { pino } from "pino";
 
-const logger: Logger = pino({
-    level: process.env.LOG_LEVEL || "info",
-    transport: {
-        target: "pino-pretty" // To make the JSON logs pretty & readable
-    },
-    formatters: {
-        level: (label, number) => {
-            return { level: label.toUpperCase() };
+dotenv.config()
+
+const handlers = String(process.env.LOG_HANDLERS).split(",")
+const targets = [];
+
+if (handlers.includes("console")) {
+    targets.push({
+        target: "pino-pretty"
+    })
+}
+
+if (handlers.includes("file")) {
+    targets.push({
+        target: "pino/file",
+        options: { destination: process.env.LOG_FILE_PATH || "server.log" },
+    })
+}
+
+const logger = pino(
+    {
+        level: process.env.LOG_LEVEL || "info",
+        formatters: {
+            bindings: (bindings) => {
+                return { PID: bindings.pid };
+            }
         },
-        bindings: (bindings) => {
-            return { processID: bindings.pid };
-        }
-    },
-    timestamp: () => {
-        const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-            dateStyle: "long",
-            timeStyle: "long",
-            timeZone: process.env.LOG_TIMEZONE || "UTC"
-        });
+        timestamp: () => {
+            const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+                dateStyle: "long",
+                timeStyle: "long",
+                timeZone: process.env.LOG_TIMEZONE || "UTC"
+            });
 
-        return `,"time":"${dateTimeFormatter.format(Date.now())}"`;
+            return `,"time":"${dateTimeFormatter.format(Date.now())}"`;
+        },
+        messageKey: "message",
+            errorKey: "error"
     },
-    messageKey: "message",
-    errorKey: "error"
-});
+    pino.transport({ targets }) 
+);
 
 export default logger;
+
 // FATAL - 60
 // ERROR - 50
 // WARN  - 40

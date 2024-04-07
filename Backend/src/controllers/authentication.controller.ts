@@ -17,7 +17,7 @@ const register: RequestHandler = async (request, response, next) => {
         });
 
         if (user) {
-            throw new ServerError("VALIDATION_ERROR", [
+            throw ServerError.ValidationError([
                 { cause: "email", message: "An account with given email already exists" }
             ]);
         }
@@ -48,7 +48,7 @@ const login: RequestHandler = async (request, response, next) => {
         });
 
         if (!user) {
-            throw new ServerError("VALIDATION_ERROR", [
+            throw ServerError.ValidationError([
                 { cause: "email", message: "An account with given email does not exists" }
             ]);
         }
@@ -56,7 +56,7 @@ const login: RequestHandler = async (request, response, next) => {
         const isPasswordSame: boolean = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
-            throw new ServerError("VALIDATION_ERROR", [{ cause: "password", message: "Password is incorrect" }]);
+            throw ServerError.ValidationError([{ cause: "password", message: "Password is incorrect" }]);
         }
 
         const tokenPayload = {
@@ -89,7 +89,7 @@ const generateOTP: RequestHandler = async (request, response, next) => {
         const tokenFromCookie: string = request.cookies["2FA-token"];
 
         if (!tokenFromCookie) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "2FA token missing", message: "Unable to generate OTP. Please login again" }
             ]);
         }
@@ -101,7 +101,7 @@ const generateOTP: RequestHandler = async (request, response, next) => {
         });
 
         if (!user) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
             ]);
         }
@@ -148,7 +148,7 @@ const generateOTP: RequestHandler = async (request, response, next) => {
         response.status(201).json();
     } catch (e) {
         if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
-            e = new ServerError("AUTHETICATION_ERROR", [
+            e = ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
             ]);
         }
@@ -162,7 +162,7 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
         const tokenFromCookie: string = request.cookies["2FA-token"];
 
         if (!tokenFromCookie) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "2FA token missing", message: "Unable to verify OTP. Please login again" }
             ]);
         }
@@ -170,7 +170,7 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
         const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
 
         if (!payload.tid) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
             ]);
         }
@@ -183,7 +183,7 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
         });
 
         if (!user || !session) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
             ]);
         }
@@ -191,13 +191,13 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
         jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
 
         if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
             ]);
         }
 
         if (Number.parseInt(request.body.otp) !== session.otp) {
-            throw new ServerError("AUTHETICATION_ERROR", [
+            throw ServerError.AuthenticationError([
                 { cause: "Invalid OTP", message: "Incorrect OTP entered. Please try again" }
             ]);
         }
@@ -256,13 +256,13 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
         response.status(201).json();
     } catch (e) {
         if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
-            e = new ServerError("AUTHETICATION_ERROR", [
+            e = ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
             ]);
         }
 
         if (e instanceof TokenExpiredError) {
-            e = new ServerError("AUTHETICATION_ERROR", [
+            e = ServerError.AuthenticationError([
                 { cause: "Expired 2FA token", message: "OTP Expired. Please login again" }
             ]);
         }
