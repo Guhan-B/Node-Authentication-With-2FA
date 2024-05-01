@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import emailjs, { EmailJSResponseStatus } from '@emailjs/nodejs';
 import { v4 } from "uuid";
 import { RequestHandler } from "express";
 import { jwtDecode, InvalidTokenError } from "jwt-decode";
@@ -110,6 +111,12 @@ const generateOTP: RequestHandler = async (request, response, next) => {
 
         const OTP: number = Math.floor(Math.random() * (9999 - 1000) + 1000);
 
+        await emailjs.send('Express_2FA_Service', 'Express_2FA_Template', {
+            recipientAddress: user.email,
+            recipientName: user.name,
+            OTP: OTP
+        });
+
         const tokenPayload = {
             tid: v4(),
             uid: user.id,
@@ -151,6 +158,13 @@ const generateOTP: RequestHandler = async (request, response, next) => {
             e = ServerError.AuthenticationError([
                 { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
             ]);
+        }
+
+        if(e instanceof EmailJSResponseStatus) {
+            console.log(e);
+            e = ServerError.InternalServerError([
+                { cause: "Mailing failed", message: "Unable to generate OTP. Please login again" }
+            ])
         }
 
         next(e);

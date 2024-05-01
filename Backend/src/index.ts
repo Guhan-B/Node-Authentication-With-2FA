@@ -3,6 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import emailjs from '@emailjs/nodejs';
 import { pinoHttp } from "pino-http";
 import { JwtPayload } from "jwt-decode";
 
@@ -11,6 +12,12 @@ import router from "./routes/index.js";
 import { errorHandler, validationHandler } from "./middlewares/index.js";
 
 dotenv.config();
+
+emailjs.init({
+    publicKey: process.env.EMAILJS_PUBLIC_KEY as string,
+    privateKey: process.env.EMAILJS_PRIVATE_KEY as string, 
+});
+
 declare global {
     namespace Express {
         export interface Request {
