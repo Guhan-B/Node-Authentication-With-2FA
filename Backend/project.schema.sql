@@ -1,7 +1,7 @@
 CREATE TABLE user (
 	id            VARCHAR(64)     NOT NULL UNIQUE,
     name          VARCHAR(128)    NOT NULL,
-    email         VARCHAR(512)    NOT NULL,
+    email         VARCHAR(512)    NOT NULL UNIQUE,
     password      VARCHAR(256)    NOT NULL,
     avatar        INT             DEFAULT 1,
     verified      INT             DEFAULT 0,
@@ -13,7 +13,7 @@ CREATE TABLE user (
 CREATE TABLE session (
 	id            VARCHAR(64)     NOT NULL UNIQUE,
     user_id       VARCHAR(64)     NOT NULL,
-    token         VARCHAR(256)    NOT NULL,
+    token         VARCHAR(256)    NOT NULL UNIQUE,
     created_at    VARCHAR(128)    NOT NULL,
     
     CONSTRAINT pk_session_id   PRIMARY KEY (id),
@@ -24,7 +24,7 @@ CREATE TABLE verification (
 	id            VARCHAR(64)     NOT NULL UNIQUE,
     user_id       VARCHAR(64)     NOT NULL,
     otp           INT             NOT NULL,
-    token         VARCHAR(256)    NOT NULL,
+    token         VARCHAR(256)    NOT NULL UNIQUE,
     created_at    VARCHAR(128)    NOT NULL,
     
     CONSTRAINT pk_verification_id   PRIMARY KEY (id),

@@ -3,7 +3,7 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import emailjs from '@emailjs/nodejs';
+import emailjs from "@emailjs/nodejs";
 import { pinoHttp } from "pino-http";
 import { JwtPayload } from "jwt-decode";
 
@@ -13,10 +13,19 @@ import { errorHandler, validationHandler } from "./middlewares/index.js";
 
 dotenv.config();
 
-emailjs.init({
-    publicKey: process.env.EMAILJS_PUBLIC_KEY as string,
-    privateKey: process.env.EMAILJS_PRIVATE_KEY as string, 
-});
+/* 
+    Initilizing EmailJS service. Public & private key can be obtained from 
+    https://dashboard.emailjs.com/admin/account dashboard
+*/
+if (process.env.EMAILJS_PUBLIC_KEY && process.env.EMAILJS_PRIVATE_KEY) {
+    emailjs.init({
+        publicKey: process.env.EMAILJS_PUBLIC_KEY,
+        privateKey: process.env.EMAILJS_PRIVATE_KEY
+    });
+} else {
+    logger.fatal("EMAILJS_PUBLIC_KEY / EMAILJS_PRIVATE_KEY is missing from environment variables");
+    process.exit(1);
+}
 
 declare global {
     namespace Express {
@@ -35,8 +44,8 @@ declare global {
 const server = () => {
     const app = express();
 
-    app.use(pinoHttp({ logger: logger, useLevel: "trace" }))
-    app.use(helmet())
+    app.use(pinoHttp({ logger: logger, useLevel: "trace" }));
+    app.use(helmet());
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
     app.use(cookieParser());

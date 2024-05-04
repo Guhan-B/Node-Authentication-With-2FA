@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import emailjs, { EmailJSResponseStatus } from '@emailjs/nodejs';
+import emailjs, { EmailJSResponseStatus } from "@emailjs/nodejs";
 import { v4 } from "uuid";
 import { RequestHandler } from "express";
 import { jwtDecode, InvalidTokenError } from "jwt-decode";
@@ -54,15 +54,15 @@ const login: RequestHandler = async (request, response, next) => {
             ]);
         }
 
-        const isPasswordSame: boolean = await bcrypt.compare(request.body.password, user.password);
+        const isPasswordSame = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
             throw ServerError.ValidationError([{ cause: "password", message: "Password is incorrect" }]);
         }
 
-        const tokenPayload = {
+        const tokenPayload: CustomJwtPayload = {
             uid: user.id
-        } satisfies CustomJwtPayload;
+        };
 
         const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
             expiresIn: "1m",
@@ -109,9 +109,9 @@ const generateOTP: RequestHandler = async (request, response, next) => {
 
         jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
 
-        const OTP: number = Math.floor(Math.random() * (9999 - 1000) + 1000);
+        const OTP = Math.floor(Math.random() * (9999 - 1000) + 1000);
 
-        await emailjs.send('Express_2FA_Service', 'Express_2FA_Template', {
+        await emailjs.send(process.env.EMAILJS_SERVICE_ID as string, process.env.EMAILJS_TEMPLATE_ID as string, {
             recipientAddress: user.email,
             recipientName: user.name,
             OTP: OTP
@@ -121,7 +121,7 @@ const generateOTP: RequestHandler = async (request, response, next) => {
             tid: v4(),
             uid: user.id,
             createdAt: new Date().toUTCString()
-        } satisfies CustomJwtPayload;
+        };
 
         const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
             expiresIn: "1h",
@@ -147,7 +147,7 @@ const generateOTP: RequestHandler = async (request, response, next) => {
         response.clearCookie("2FA-token");
 
         response.cookie("2FA-token", token, {
-            maxAge: 1 * 60 * 60 * 1000,
+            maxAge: 5 * 60 * 1000, // OTP validity 5 minutes
             httpOnly: true,
             secure: false // if secure: true cookie works only on secure channel i.e HTTPS
         });
@@ -160,11 +160,11 @@ const generateOTP: RequestHandler = async (request, response, next) => {
             ]);
         }
 
-        if(e instanceof EmailJSResponseStatus) {
+        if (e instanceof EmailJSResponseStatus) {
             console.log(e);
             e = ServerError.InternalServerError([
                 { cause: "Mailing failed", message: "Unable to generate OTP. Please login again" }
-            ])
+            ]);
         }
 
         next(e);
@@ -286,7 +286,22 @@ const verifyOTP: RequestHandler = async (request, response, next) => {
 };
 
 const logout: RequestHandler = async (request, response, next) => {
-    console.log(request.body);
+    try {
+        const tokenFromCookie = request.cookies["access-token"] as string;
+        const tokenHashFromCookie = crypto.createHash("sha256").update(tokenFromCookie).digest("hex");
+
+        await prisma.session.delete({
+            where: {
+                token: tokenHashFromCookie
+            }
+        });
+
+        response.clearCookie("access-token");
+
+        response.status(201).json();
+    } catch (e) {
+        return next(e);
+    }
 };
 
 const resetPassword: RequestHandler = async (request, response, next) => {

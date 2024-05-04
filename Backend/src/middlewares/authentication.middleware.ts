@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { jwtDecode, InvalidTokenError, JwtPayload } from "jwt-decode";
 import { RequestHandler } from "express";
@@ -45,9 +45,7 @@ const handler = (): RequestHandler => async (request, response, next) => {
                     ])
                 ); // Not throwing here because the error is not reaching catch
             } else {
-                const isTokenSame = await bcrypt.compare(tokenFromCookie, session.token);
-
-                if (!isTokenSame) {
+                if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
                     next(
                         ServerError.AuthenticationError([
                             { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
