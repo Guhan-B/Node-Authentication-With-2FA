@@ -5,10 +5,11 @@ import { RequestHandler } from "express";
 
 import prisma from "../utilities/prisma.js";
 import { ServerError } from "../utilities/error.js";
+import { Token } from "../utilities/generator.js";
 
 const handler = (): RequestHandler => async (request, response, next) => {
     try {
-        const tokenFromCookie: string = request.cookies["access-token"];
+        const tokenFromCookie: string = request.cookies["Access-Token"];
 
         if (!tokenFromCookie) {
             throw ServerError.AuthenticationError([
@@ -16,17 +17,12 @@ const handler = (): RequestHandler => async (request, response, next) => {
             ]);
         }
 
-        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
-
-        if (!payload.tid) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-            ]);
-        }
+        const payload: CustomJwtPayload = await Token.verify(tokenFromCookie);
 
         const user = await prisma.user.findUnique({
             where: { id: payload.uid }
         });
+
         const session = await prisma.session.findUnique({
             where: { id: payload.tid }
         });
@@ -37,27 +33,15 @@ const handler = (): RequestHandler => async (request, response, next) => {
             ]);
         }
 
-        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password, async (error) => {
-            if (error) {
-                next(
-                    ServerError.AuthenticationError([
-                        { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-                    ])
-                ); // Not throwing here because the error is not reaching catch
-            } else {
-                if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
-                    next(
-                        ServerError.AuthenticationError([
-                            { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-                        ])
-                    ); // Not throwing here because the error is not reaching catch
-                }
+        if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
+            throw ServerError.AuthenticationError([
+                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
+            ]);
+        }
 
-                request.uid = user.id;
+        request.uid = user.id;
 
-                next();
-            }
-        });
+        next();
     } catch (e) {
         if (e instanceof InvalidTokenError) {
             e = ServerError.AuthenticationError([

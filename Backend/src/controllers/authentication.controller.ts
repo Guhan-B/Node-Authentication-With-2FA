@@ -1,15 +1,12 @@
 import bcrypt from "bcrypt";
 import crypto from "node:crypto";
-import jwt from "jsonwebtoken";
-import emailjs, { EmailJSResponseStatus } from "@emailjs/nodejs";
-import { v4 } from "uuid";
+import { nanoid } from "nanoid";
 import { RequestHandler } from "express";
-import { jwtDecode, InvalidTokenError } from "jwt-decode";
 
 import prisma from "../utilities/prisma.js";
+import mailer from "../utilities/mailer.js";
 import { ServerError } from "../utilities/error.js";
-
-const { JsonWebTokenError, TokenExpiredError } = jwt;
+import { Code, Token } from "../utilities/generator.js";
 
 const register: RequestHandler = async (request, response, next) => {
     try {
@@ -19,7 +16,7 @@ const register: RequestHandler = async (request, response, next) => {
 
         if (user) {
             throw ServerError.ValidationError([
-                { cause: "email", message: "An account with given email already exists" }
+                { cause: "Email", message: "An account with given email already exists" }
             ]);
         }
 
@@ -27,7 +24,7 @@ const register: RequestHandler = async (request, response, next) => {
 
         await prisma.user.create({
             data: {
-                id: v4(),
+                id: nanoid(),
                 name: request.body.name,
                 email: request.body.email,
                 password: hash,
@@ -42,7 +39,7 @@ const register: RequestHandler = async (request, response, next) => {
     }
 };
 
-const login: RequestHandler = async (request, response, next) => {
+const loginGenerateOTP: RequestHandler = async (request, response, next) => {
     try {
         const user = await prisma.user.findUnique({
             where: { email: request.body.email }
@@ -50,269 +47,181 @@ const login: RequestHandler = async (request, response, next) => {
 
         if (!user) {
             throw ServerError.ValidationError([
-                { cause: "email", message: "An account with given email does not exists" }
+                { cause: "Email", message: "An account with given email does not exists" }
             ]);
         }
 
         const isPasswordSame = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
-            throw ServerError.ValidationError([{ cause: "password", message: "Password is incorrect" }]);
+            throw ServerError.ValidationError([{ cause: "Password", message: "Password is incorrect" }]);
         }
 
-        const tokenPayload: CustomJwtPayload = {
-            uid: user.id
-        };
+        const { code, token } = await Code.generate(user.id, "5m");
 
-        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
-            expiresIn: "1m",
-            algorithm: "HS256",
-            header: {
-                typ: "2FA-JWT",
-                alg: "HS256"
-            }
+        const mailerResponse = await mailer.emails.send({
+            from: "no-reply@justloop.xyz",
+            to: user.email,
+            subject: "Your JustLoop Account: Access From New Device",
+            html: ` 
+                <p>
+                    Hello <strong>${user.name}</strong>, 
+                    It looks like you are trying to log in from a new device. 
+                    Here is the <strong>code</strong> you need to access your account 
+                    <strong>${code}</strong>
+                </p>
+            `
         });
 
-        response.cookie("2FA-token", token, {
-            maxAge: 1 * 60 * 1000,
-            httpOnly: true,
-            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
-        });
+        if (mailerResponse.error) {
+            throw ServerError.InternalServerError([
+                { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
+            ]);
+        }
 
-        response.status(201).json();
+        response
+            .clearCookie("Verification-Token")
+            .cookie("Verification-Token", token, { maxAge: 5 * 60 * 1000, httpOnly: true, secure: false })
+            .status(201)
+            .json();
     } catch (e) {
         return next(e);
     }
 };
 
-const generateOTP: RequestHandler = async (request, response, next) => {
+const loginVerifyOTP: RequestHandler = async (request, response, next) => {
     try {
-        const tokenFromCookie: string = request.cookies["2FA-token"];
+        const tokenFromCookie: string = request.cookies["Verification-Token"];
 
         if (!tokenFromCookie) {
             throw ServerError.AuthenticationError([
-                { cause: "2FA token missing", message: "Unable to generate OTP. Please login again" }
+                { cause: "Verification Token Missing", message: "Unable to verify code. Please try again" }
             ]);
         }
 
-        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
+        const uid = await Code.verify(Number.parseInt(request.body.code), tokenFromCookie);
 
-        const user = await prisma.user.findUnique({
-            where: { id: payload.uid }
-        });
-
-        if (!user) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
-            ]);
-        }
-
-        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
-
-        const OTP = Math.floor(Math.random() * (9999 - 1000) + 1000);
-
-        await emailjs.send(process.env.EMAILJS_SERVICE_ID as string, process.env.EMAILJS_TEMPLATE_ID as string, {
-            recipientAddress: user.email,
-            recipientName: user.name,
-            OTP: OTP
-        });
-
-        const tokenPayload = {
-            tid: v4(),
-            uid: user.id,
-            createdAt: new Date().toUTCString()
-        };
-
-        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
-            expiresIn: "1h",
-            algorithm: "HS256",
-            header: {
-                typ: "2FA-JWT",
-                alg: "HS256"
-            }
-        });
-
-        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-        await prisma.verification.create({
-            data: {
-                id: tokenPayload.tid,
-                user_id: user.id,
-                token: tokenHash,
-                otp: OTP,
-                created_at: tokenPayload.createdAt
-            }
-        });
-
-        response.clearCookie("2FA-token");
-
-        response.cookie("2FA-token", token, {
-            maxAge: 5 * 60 * 1000, // OTP validity 5 minutes
-            httpOnly: true,
-            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
-        });
-
-        response.status(201).json();
-    } catch (e) {
-        if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
-            e = ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to generate OTP. Please login again" }
-            ]);
-        }
-
-        if (e instanceof EmailJSResponseStatus) {
-            console.log(e);
-            e = ServerError.InternalServerError([
-                { cause: "Mailing failed", message: "Unable to generate OTP. Please login again" }
-            ]);
-        }
-
-        next(e);
-    }
-};
-
-const verifyOTP: RequestHandler = async (request, response, next) => {
-    try {
-        const tokenFromCookie: string = request.cookies["2FA-token"];
-
-        if (!tokenFromCookie) {
-            throw ServerError.AuthenticationError([
-                { cause: "2FA token missing", message: "Unable to verify OTP. Please login again" }
-            ]);
-        }
-
-        const payload: CustomJwtPayload = jwtDecode(tokenFromCookie);
-
-        if (!payload.tid) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
-            ]);
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: payload.uid }
-        });
-        const session = await prisma.verification.findUnique({
-            where: { id: payload.tid }
-        });
-
-        if (!user || !session) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
-            ]);
-        }
-
-        jwt.verify(tokenFromCookie, process.env.TOKEN_SECRET_KEY + user.password);
-
-        if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
-            ]);
-        }
-
-        if (Number.parseInt(request.body.otp) !== session.otp) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid OTP", message: "Incorrect OTP entered. Please try again" }
-            ]);
-        }
-
-        await prisma.verification.delete({
-            where: {
-                id: payload.tid
-            }
-        });
-
-        if (user.verified === 0) {
-            await prisma.user.update({
-                where: {
-                    id: user.id
-                },
-                data: {
-                    verified: 1
-                }
-            });
-        }
-
-        const tokenPayload = {
-            tid: v4(),
-            uid: user.id,
-            createdAt: new Date().toUTCString()
-        } satisfies CustomJwtPayload;
-
-        const token = jwt.sign(tokenPayload, process.env.TOKEN_SECRET_KEY + user.password, {
-            expiresIn: "7d",
-            algorithm: "HS256",
-            header: {
-                typ: "Access-JWT",
-                alg: "HS256"
-            }
-        });
-
-        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const { token, payload, hash } = await Token.generate(uid, "7d", "Access-Token");
 
         await prisma.session.create({
             data: {
-                id: tokenPayload.tid,
-                user_id: user.id,
-                token: tokenHash,
-                created_at: tokenPayload.createdAt
+                id: payload.tid,
+                user_id: uid,
+                token: hash,
+                created_at: payload.createdAt
             }
         });
 
-        response.clearCookie("2FA-token");
-
-        response.cookie("access-token", token, {
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            httpOnly: true,
-            secure: false // if secure: true cookie works only on secure channel i.e HTTPS
-        });
-
-        response.status(201).json();
+        response
+            .clearCookie("Verification-Token")
+            .cookie("Access-Token", token, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: true, secure: false })
+            .status(201)
+            .json();
     } catch (e) {
-        if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError || e instanceof TokenExpiredError) {
-            e = ServerError.AuthenticationError([
-                { cause: "Invalid 2FA token", message: "Unable to verify OTP. Please login again" }
-            ]);
-        }
-
-        if (e instanceof TokenExpiredError) {
-            e = ServerError.AuthenticationError([
-                { cause: "Expired 2FA token", message: "OTP Expired. Please login again" }
-            ]);
-        }
-
         next(e);
     }
 };
 
 const logout: RequestHandler = async (request, response, next) => {
     try {
-        const tokenFromCookie = request.cookies["access-token"] as string;
+        const tokenFromCookie = request.cookies["Access-Token"] as string;
         const tokenHashFromCookie = crypto.createHash("sha256").update(tokenFromCookie).digest("hex");
 
-        await prisma.session.delete({
-            where: {
-                token: tokenHashFromCookie
-            }
-        });
+        await prisma.session.delete({ where: { user_id: request.uid, token: tokenHashFromCookie } });
 
-        response.clearCookie("access-token");
-
-        response.status(201).json();
+        response.clearCookie("Access-Token").status(201).json();
     } catch (e) {
         return next(e);
     }
 };
 
-const resetPassword: RequestHandler = async (request, response, next) => {
-    console.log(request.body);
+const resetPasswordGenerateOTP: RequestHandler = async (request, response, next) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: request.uid }
+        });
+
+        if (!user) {
+            throw ServerError.AuthenticationError([
+                { cause: "User Not Found", message: "Unable to generate OTP. Try again" }
+            ]);
+        }
+
+        const { code, token } = await Code.generate(user.id, "5m");
+
+        const mailerResponse = await mailer.emails.send({
+            from: "no-reply@justloop.xyz",
+            to: user.email,
+            subject: "Your JustLoop Account: Password Reset",
+            html: ` 
+                <p>
+                    Hello <strong>${user.name}</strong>, 
+                    It looks like you are trying to change your account password. Once the password is 
+                    changed you will be logged out of all active devices. Here is the <strong>code</strong> 
+                    you need for changing your account password <strong>${code}</strong>
+                </p>
+            `
+        });
+
+        if (mailerResponse.error) {
+            throw ServerError.InternalServerError([
+                { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
+            ]);
+        }
+
+        response
+            .clearCookie("Verification-Token")
+            .cookie("Verification-Token", token, { maxAge: 5 * 60 * 1000, httpOnly: true, secure: false })
+            .status(201)
+            .json();
+    } catch (e) {
+        next(e);
+    }
 };
+
+const resetPasswordVerifyOTP: RequestHandler = async (request, response, next) => {
+    try {
+        const tokenFromCookie: string = request.cookies["Verification-Token"];
+
+        if (!tokenFromCookie) {
+            throw ServerError.AuthenticationError([
+                { cause: "Verification Token Missing", message: "Unable to verify code. Please try again" }
+            ]);
+        }
+
+        const uid = await Code.verify(Number.parseInt(request.body.code), tokenFromCookie);
+
+        const hash: string = await bcrypt.hash(request.body.password, 16);
+
+        await prisma.user.update({
+            data: {
+                password: hash
+            },
+            where: {
+                id: uid
+            }
+        });
+
+        await prisma.session.deleteMany({
+            where: {
+                user_id: uid
+            }
+        });
+
+        response.clearCookie("Verification-Token").clearCookie("Access-Token").status(201).json();
+    } catch (e) {
+        return next(e);
+    }
+};
+
+const forgetPassword: RequestHandler = async (request, response, next) => {};
 
 export default {
     register,
-    login,
+    loginGenerateOTP,
+    loginVerifyOTP,
     logout,
-    resetPassword,
-    generateOTP,
-    verifyOTP
+    resetPasswordGenerateOTP,
+    resetPasswordVerifyOTP,
+    forgetPassword
 };

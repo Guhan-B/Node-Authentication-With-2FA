@@ -1,31 +1,16 @@
 import dotenv from "dotenv";
-import express from "express";
+dotenv.config();
+
+import express, { Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import emailjs from "@emailjs/nodejs";
 import { pinoHttp } from "pino-http";
 import { JwtPayload } from "jwt-decode";
 
 import logger from "./utilities/logger.js";
 import router from "./routes/index.js";
 import { errorHandler, validationHandler } from "./middlewares/index.js";
-
-dotenv.config();
-
-/* 
-    Initilizing EmailJS service. Public & private key can be obtained from 
-    https://dashboard.emailjs.com/admin/account dashboard
-*/
-if (process.env.EMAILJS_PUBLIC_KEY && process.env.EMAILJS_PRIVATE_KEY) {
-    emailjs.init({
-        publicKey: process.env.EMAILJS_PUBLIC_KEY,
-        privateKey: process.env.EMAILJS_PRIVATE_KEY
-    });
-} else {
-    logger.fatal("EMAILJS_PUBLIC_KEY / EMAILJS_PRIVATE_KEY is missing from environment variables");
-    process.exit(1);
-}
 
 declare global {
     namespace Express {
@@ -35,14 +20,14 @@ declare global {
     }
 
     type CustomJwtPayload = JwtPayload & {
-        tid?: string;
+        tid: string;
         uid: string;
-        createdAt?: string;
+        createdAt: string;
     };
 }
 
 const server = () => {
-    const app = express();
+    const app: Express = express();
 
     app.use(pinoHttp({ logger: logger, useLevel: "trace" }));
     app.use(helmet());
@@ -53,8 +38,8 @@ const server = () => {
     app.use("/", router);
     app.use(errorHandler());
 
-    const serverHost = process.env.SERVER_HOST || "localhost";
-    const serverPort = process.env.SERVER_PORT || "8000";
+    const serverHost: string = process.env.SERVER_HOST || "localhost";
+    const serverPort: string = process.env.SERVER_PORT || "8000";
 
     app.listen(Number.parseInt(serverPort), serverHost, () => {
         logger.info(`Server is started and is running on port ${serverHost}:${serverPort}`);

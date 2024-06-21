@@ -7,12 +7,14 @@ import { authenticationController } from "../controllers/index.js";
 const router = Router();
 
 // Register the endpoints
-router.get("/login/verify", authenticationController.generateOTP);
-
 router.post("/register", authenticationController.register);
-router.post("/login", authenticationController.login);
-router.post("/login/verify", authenticationController.verifyOTP);
+
+router.post("/login", authenticationController.loginGenerateOTP);
+router.post("/login/verify", authenticationController.loginVerifyOTP);
+
+router.get("/password/reset", authenticationHandler(), authenticationController.resetPasswordGenerateOTP);
+router.post("/password/reset", authenticationHandler(), authenticationController.resetPasswordVerifyOTP);
+
 router.delete("/logout", authenticationHandler(), authenticationController.logout);
-router.post("/reset-password", authenticationController.resetPassword);
 
 export default router;

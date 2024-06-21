@@ -8,19 +8,18 @@ datasource db {
 }
 
 model user {
-  id           String         @id @unique(map: "id") @db.VarChar(64)
+  id           String         @id @unique(map: "id") @db.VarChar(30)
   name         String         @db.VarChar(128)
   email        String         @unique(map: "email") @db.VarChar(512)
   password     String         @db.VarChar(256)
-  avatar       Int?           @default(1)
-  verified     Int?           @default(0)
+  avatar       Int            @default(1)
   created_at   String         @db.VarChar(128)
   session      session[]
   verification verification[]
 }
 
 model session {
-  id         String @id @unique(map: "id") @db.VarChar(64)
+  id         String @id @unique(map: "id") @db.VarChar(30)
   user_id    String @db.VarChar(64)
   token      String @unique(map: "token") @db.VarChar(256)
   created_at String @db.VarChar(128)
@@ -30,9 +29,9 @@ model session {
 }
 
 model verification {
-  id         String @id @unique(map: "id") @db.VarChar(64)
+  id         String @id @unique(map: "id") @db.VarChar(30)
   user_id    String @db.VarChar(64)
-  otp        Int
+  code       Int
   token      String @unique(map: "token") @db.VarChar(256)
   created_at String @db.VarChar(128)
   user       user   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_verification_user")
