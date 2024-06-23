@@ -13,8 +13,7 @@
         "prisma-sync": "npx prisma db pull && npx prisma generate",
         "prettier": "prettier --write --list-different .",
         "lint": "eslint . --max-warnings 0",
-        "lint:fix": "npm run lint -- --fix",
-        "react-email": "email dev"
+        "lint:fix": "npm run lint -- --fix"
     },
     "author": "Guhan B <guhan.b.official@gmail.com>",
     "license": "ISC",
@@ -39,21 +38,17 @@
         "@types/bcrypt": "^5.0.2",
         "@types/cookie-parser": "^1.4.7",
         "@types/cors": "^2.8.17",
-        "@types/dotenv": "^8.2.0",
         "@types/express": "^4.17.21",
-        "@types/helmet": "^4.0.0",
-        "@types/joi": "^17.2.3",
         "@types/jsonwebtoken": "^9.0.6",
-        "@types/node": "^20.11.24",
+        "@types/node": "^20.14.8",
         "@types/react": "^18.3.3",
-        "@types/uuid": "^9.0.8",
         "@typescript-eslint/eslint-plugin": "^7.1.0",
         "@typescript-eslint/parser": "^7.1.0",
         "concurrently": "^8.2.2",
         "eslint": "^8.57.0",
         "nodemon": "^3.1.0",
         "prettier": "^3.2.5",
-        "prisma": "^5.7.1",
+        "prisma": "^5.15.1",
         "typescript": "^5.3.3"
     }
 }

@@ -5,7 +5,6 @@ import express, { Express } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { pinoHttp } from "pino-http";
 import { JwtPayload } from "jwt-decode";
 
 import logger from "./utilities/logger.js";
@@ -26,10 +25,9 @@ declare global {
     };
 }
 
-const server = () => {
+const server = () => {    
     const app: Express = express();
 
-    app.use(pinoHttp({ logger: logger, useLevel: "trace" }));
     app.use(helmet());
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
@@ -38,10 +36,10 @@ const server = () => {
     app.use("/", router);
     app.use(errorHandler());
 
-    const serverHost: string = process.env.SERVER_HOST || "localhost";
-    const serverPort: string = process.env.SERVER_PORT || "8000";
+    const serverHost = "localhost";
+    const serverPort = 8000;
 
-    app.listen(Number.parseInt(serverPort), serverHost, () => {
+    app.listen(serverPort, serverHost, () => {
         logger.info(`Server is started and is running on port ${serverHost}:${serverPort}`);
     });
 };

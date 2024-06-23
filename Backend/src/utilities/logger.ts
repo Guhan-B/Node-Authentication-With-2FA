@@ -22,7 +22,6 @@ if (handlers.includes("file")) {
 const logger = pino(
     {
         level: process.env.LOG_LEVEL || "info",
-        customLevels: { fine: 25 },
         formatters: {
             bindings: (bindings) => {
                 return { PID: bindings.pid };
@@ -49,6 +48,5 @@ export default logger;
 // ERROR - 50
 // WARN  - 40
 // INFO  - 30  <- Default Level
-// FINE  - 25
 // DEBUG - 20
 // TRACE - 10

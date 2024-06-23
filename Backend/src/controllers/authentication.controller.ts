@@ -57,7 +57,7 @@ const loginGenerateOTP: RequestHandler = async (request, response, next) => {
             throw ServerError.ValidationError([{ cause: "Password", message: "Password is incorrect" }]);
         }
 
-        const { code, token } = await Code.generate(user.id, "5m");
+        const { tid, code, token } = await Code.generate(user.id, "5m");
 
         const mailerResponse = await mailer.emails.send({
             from: "no-reply@justloop.xyz",
@@ -67,13 +67,18 @@ const loginGenerateOTP: RequestHandler = async (request, response, next) => {
                 <p>
                     Hello <strong>${user.name}</strong>, 
                     It looks like you are trying to log in from a new device. 
-                    Here is the <strong>code</strong> you need to access your account 
-                    <strong>${code}</strong>
+                    Here is the verification code you need to access your account 
+                    <strong>${code}</strong>. The verification code will be valid 
+                    for <strong>5 Minutes</strong>.
                 </p>
             `
         });
 
         if (mailerResponse.error) {
+            await prisma.verification.delete({
+                where: { id: tid }
+            });
+
             throw ServerError.InternalServerError([
                 { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
             ]);
@@ -101,13 +106,13 @@ const loginVerifyOTP: RequestHandler = async (request, response, next) => {
 
         const uid = await Code.verify(Number.parseInt(request.body.code), tokenFromCookie);
 
-        const { token, payload, hash } = await Token.generate(uid, "7d", "Access-Token");
+        const { payload, token, tokenHash } = await Token.generate(uid, "7d", "Access-Token");
 
         await prisma.session.create({
             data: {
                 id: payload.tid,
                 user_id: uid,
-                token: hash,
+                token: tokenHash,
                 created_at: payload.createdAt
             }
         });
@@ -135,35 +140,40 @@ const logout: RequestHandler = async (request, response, next) => {
     }
 };
 
-const resetPasswordGenerateOTP: RequestHandler = async (request, response, next) => {
+const changePasswordGenerateOTP: RequestHandler = async (request, response, next) => {
     try {
         const user = await prisma.user.findUnique({
-            where: { id: request.uid }
+            where: { email: request.body.email }
         });
 
         if (!user) {
-            throw ServerError.AuthenticationError([
-                { cause: "User Not Found", message: "Unable to generate OTP. Try again" }
+            throw ServerError.ValidationError([
+                { cause: "Email", message: "An account with given email does not exists" }
             ]);
         }
 
-        const { code, token } = await Code.generate(user.id, "5m");
+        const { tid, token , code} = await Code.generate(user.id, "5m");
 
         const mailerResponse = await mailer.emails.send({
             from: "no-reply@justloop.xyz",
             to: user.email,
-            subject: "Your JustLoop Account: Password Reset",
+            subject: "Your JustLoop Account: Password Change",
             html: ` 
                 <p>
                     Hello <strong>${user.name}</strong>, 
                     It looks like you are trying to change your account password. Once the password is 
-                    changed you will be logged out of all active devices. Here is the <strong>code</strong> 
-                    you need for changing your account password <strong>${code}</strong>
+                    changed you will be logged out of all active devices. Here is the verificaion code 
+                    you need for changing your account password <strong>${code}</strong>. The verification 
+                    code will be valid for <strong>5 Minutes</strong>.
                 </p>
             `
         });
 
         if (mailerResponse.error) {
+            await prisma.verification.delete({
+                where: { id: tid }
+            });
+
             throw ServerError.InternalServerError([
                 { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
             ]);
@@ -179,7 +189,7 @@ const resetPasswordGenerateOTP: RequestHandler = async (request, response, next)
     }
 };
 
-const resetPasswordVerifyOTP: RequestHandler = async (request, response, next) => {
+const changePasswordVerifyOTP: RequestHandler = async (request, response, next) => {
     try {
         const tokenFromCookie: string = request.cookies["Verification-Token"];
 
@@ -194,34 +204,29 @@ const resetPasswordVerifyOTP: RequestHandler = async (request, response, next) =
         const hash: string = await bcrypt.hash(request.body.password, 16);
 
         await prisma.user.update({
-            data: {
-                password: hash
-            },
-            where: {
-                id: uid
-            }
+            data: { password: hash },
+            where: { id: uid }
         });
 
         await prisma.session.deleteMany({
-            where: {
-                user_id: uid
-            }
+            where: { user_id: uid }
         });
 
-        response.clearCookie("Verification-Token").clearCookie("Access-Token").status(201).json();
+        response
+            .clearCookie("Verification-Token")
+            .clearCookie("Access-Token")
+            .status(201)
+            .json();
     } catch (e) {
         return next(e);
     }
 };
-
-const forgetPassword: RequestHandler = async (request, response, next) => {};
 
 export default {
     register,
     loginGenerateOTP,
     loginVerifyOTP,
     logout,
-    resetPasswordGenerateOTP,
-    resetPasswordVerifyOTP,
-    forgetPassword
+    changePasswordGenerateOTP,
+    changePasswordVerifyOTP
 };

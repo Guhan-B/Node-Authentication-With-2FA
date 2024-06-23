@@ -32,7 +32,7 @@ const LOGIN_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     })
 });
 
-const VERIFY_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
+const VERIFY_LOGIN_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     code: Joi.number().min(1000).max(9999).required().messages({
         "any.required": "Field is required",
         "number.min": "Invalid OTP",
@@ -40,7 +40,14 @@ const VERIFY_USER_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     })
 });
 
-const RESET_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
+const CHANGE_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
+    email: Joi.string().email().required().messages({
+        "any.required": "Field is required",
+        "string.email": "Email provided is not valid"
+    }),
+});
+
+const VERIFY_CHANGE_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     code: Joi.number().min(1000).max(9999).required().messages({
         "any.required": "Field is required",
         "number.min": "Invalid OTP",
@@ -53,14 +60,12 @@ const RESET_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     })
 });
 
-const FORGET_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({});
-
 const RequestSchemas: Map<string, Joi.ObjectSchema<any>> = new Map<string, Joi.ObjectSchema<any>>();
 
 RequestSchemas.set("POST:/authentication/register", REGISTER_USER_REQUEST_SCHEMA);
 RequestSchemas.set("POST:/authentication/login", LOGIN_USER_REQUEST_SCHEMA);
-RequestSchemas.set("POST:/authentication/login/verify", VERIFY_USER_REQUEST_SCHEMA);
-RequestSchemas.set("POST:/authentication/password/reset", RESET_PASSWORD_REQUEST_SCHEMA);
-RequestSchemas.set("POST:/authentication/password/forget", FORGET_PASSWORD_REQUEST_SCHEMA);
+RequestSchemas.set("POST:/authentication/login/verify", VERIFY_LOGIN_USER_REQUEST_SCHEMA);
+RequestSchemas.set("POST:/authentication/change-password", CHANGE_PASSWORD_REQUEST_SCHEMA);
+RequestSchemas.set("POST:/authentication/change-password/verify", VERIFY_CHANGE_PASSWORD_REQUEST_SCHEMA);
 
 export default RequestSchemas;
