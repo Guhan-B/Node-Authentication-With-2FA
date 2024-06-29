@@ -44,7 +44,7 @@ const CHANGE_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({
     email: Joi.string().email().required().messages({
         "any.required": "Field is required",
         "string.email": "Email provided is not valid"
-    }),
+    })
 });
 
 const VERIFY_CHANGE_PASSWORD_REQUEST_SCHEMA: Joi.ObjectSchema<any> = Joi.object({

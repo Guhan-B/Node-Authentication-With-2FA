@@ -9,6 +9,7 @@ import { ServerError } from "../utilities/error.js";
 import { Code, Token } from "../utilities/generator.js";
 
 const register: RequestHandler = async (request, response, next) => {
+    console.log("HERE");
     try {
         const user = await prisma.user.findUnique({
             where: { email: request.body.email }
@@ -152,7 +153,7 @@ const changePasswordGenerateOTP: RequestHandler = async (request, response, next
             ]);
         }
 
-        const { tid, token , code} = await Code.generate(user.id, "5m");
+        const { tid, token, code } = await Code.generate(user.id, "5m");
 
         const mailerResponse = await mailer.emails.send({
             from: "no-reply@justloop.xyz",
@@ -212,11 +213,7 @@ const changePasswordVerifyOTP: RequestHandler = async (request, response, next) 
             where: { user_id: uid }
         });
 
-        response
-            .clearCookie("Verification-Token")
-            .clearCookie("Access-Token")
-            .status(201)
-            .json();
+        response.clearCookie("Verification-Token").clearCookie("Access-Token").status(201).json();
     } catch (e) {
         return next(e);
     }

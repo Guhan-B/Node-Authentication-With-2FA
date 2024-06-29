@@ -9,7 +9,10 @@ import prisma from "../utilities/prisma.js";
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 export class Code {
-    public static async generate(uid: string, expiresIn: string): Promise<{ tid: string, token: string, code: number }> {
+    public static async generate(
+        uid: string,
+        expiresIn: string
+    ): Promise<{ tid: string; token: string; code: number }> {
         const code = Math.floor(Math.random() * (9999 - 1000) + 1000);
 
         const { payload, token, tokenHash } = await Token.generate(uid, expiresIn, "Verification-Token");
@@ -24,10 +27,10 @@ export class Code {
             }
         });
 
-        return { 
-            tid: payload.tid, 
-            code: code, 
-            token: token 
+        return {
+            tid: payload.tid,
+            code: code,
+            token: token
         };
     }
 
@@ -47,7 +50,10 @@ export class Code {
 
             if (code !== verification.code) {
                 throw ServerError.AuthenticationError([
-                    { cause: "Incorrect Verification Code", message: "The verification code entered is incorrect. Please try again" }
+                    {
+                        cause: "Incorrect Verification Code",
+                        message: "The verification code entered is incorrect. Please try again"
+                    }
                 ]);
             }
 
@@ -67,7 +73,9 @@ export class Code {
             }
 
             if (e instanceof TokenExpiredError) {
-                e = ServerError.AuthenticationError([{ cause: "Expired Verification Code", message: "The verification code entered is expired" }]);
+                e = ServerError.AuthenticationError([
+                    { cause: "Expired Verification Code", message: "The verification code entered is expired" }
+                ]);
             }
 
             throw e;
@@ -76,7 +84,11 @@ export class Code {
 }
 
 export class Token {
-    public static async generate(uid: string, expiresIn: string, type: string): Promise<{ payload: CustomJwtPayload; token: string; tokenHash: string }> {
+    public static async generate(
+        uid: string,
+        expiresIn: string,
+        type: string
+    ): Promise<{ payload: CustomJwtPayload; token: string; tokenHash: string }> {
         const payload: CustomJwtPayload = {
             tid: nanoid(),
             uid: uid,

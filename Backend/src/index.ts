@@ -25,7 +25,7 @@ declare global {
     };
 }
 
-const server = () => {    
+const server = () => {
     const app: Express = express();
 
     app.use(helmet());
@@ -36,8 +36,8 @@ const server = () => {
     app.use("/", router);
     app.use(errorHandler());
 
-    const serverHost = "localhost";
-    const serverPort = 8000;
+    const serverHost = "0.0.0.0";
+    const serverPort = 80;
 
     app.listen(serverPort, serverHost, () => {
         logger.info(`Server is started and is running on port ${serverHost}:${serverPort}`);

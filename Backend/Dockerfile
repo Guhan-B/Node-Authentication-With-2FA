@@ -30,6 +30,6 @@ COPY --chown=node:node --from=build /app/prisma ./prisma
 
 RUN npx prisma generate
 
-CMD ["node", "build/index.js"]
+EXPOSE 80
 
-EXPOSE 8000
+CMD ["node", "build/index.js"]
