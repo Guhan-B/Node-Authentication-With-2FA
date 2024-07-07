@@ -1,0 +1,61 @@
+.wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    min-height: 100vh;
+}
+
+.wrapper .left {
+    grid-column: span 1;
+    background-image: url("../../assets/cover.jpg");
+    background-size: contain;
+    background-position: left center;
+}
+
+.wrapper .right {
+    grid-column: span 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wrapper .right .content {
+    width: 50%;
+}
+
+.wrapper .right .content header {
+    margin-bottom: 2rem;
+}
+
+.wrapper .right .content header h2 {
+    width: 75%;    
+    font-size: 2rem;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.2;
+    margin: 0 auto;
+}
+
+.wrapper .content footer {
+    margin-top: 4rem;
+}
+
+.wrapper .content footer span {
+    display: block;
+    width: 100%;
+    padding: 1rem;
+    text-align: center;
+    background-color: var(--color-light);
+    border-bottom: .1rem solid #d1d7dc;
+}
+
+
+.wrapper .content footer span:last-of-type {
+    border-bottom: none;
+}
+
+.wrapper .content span a {
+    font-weight: 700;
+    color: var(--color-primary);
+    text-decoration: underline;
+    cursor: pointer;
+}

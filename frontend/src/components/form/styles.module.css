@@ -1,0 +1,79 @@
+.form_wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: .5rem;
+}
+
+.form_wrapper button {
+    margin-top: .95rem;
+}
+
+.form_field_wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.form_field_wrapper .input {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    position: relative;
+    border: .1rem solid var(--color-dark);
+}
+
+.form_field_wrapper .input.error {
+    border-color: var(--color-red);
+}
+
+.form_field_wrapper .input label {
+    position: absolute;
+    font-size: 1rem;
+    font-weight: 800;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.1s ease-in-out, font-size 0.1s ease-in-out;
+    pointer-events: none;
+}
+
+.form_field_wrapper .input input {
+    width: 100%;
+    border: none;
+    outline: none;
+    font-size: 1rem;
+    padding: .75rem 1rem;
+    padding-top: 1.5rem;
+}
+
+.form_field_wrapper .input input:focus+label,
+.form_field_wrapper .input input:not(:placeholder-shown)+label {
+    font-size: .75rem;
+    transform: translateY(-140%);
+}
+
+.form_field_wrapper .input button {
+    background: none;
+    border: none;
+    outline: none;
+    display: block;
+    width: 30px;
+    margin: 0 1rem;
+    cursor: pointer;
+}
+
+.form_field_wrapper .input button img {
+    width: 100%;
+}
+
+.form_field_wrapper .error {
+    margin-top: .15rem;
+}
+
+.form_field_wrapper .error p {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-red);
+}
