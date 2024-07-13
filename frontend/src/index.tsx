@@ -8,6 +8,6 @@ import { LoginPage } from './pages/Login';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <LoginPage />
+    <RegisterPage />
   </React.StrictMode>,
 )

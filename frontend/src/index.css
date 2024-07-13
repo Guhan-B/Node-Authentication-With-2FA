@@ -2,10 +2,13 @@
 
 :root {
     --color-primary: #579de2;
-    --color-primary-dark: #3878b8;
+    --color-primary-hover: #3878b8;
     --color-dark: #101112;
     --color-light: #f7f9fa;
+    --color-light-hover: #d1d7dc;
     --color-red: #da3c18;
+    --color-white: #ffffff;
+    --color-black: #000000;
 }
 
 *,
@@ -24,6 +27,7 @@
 body {
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    background-color: var(--color-white);
 }
 
 img,

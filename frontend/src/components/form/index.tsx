@@ -54,7 +54,7 @@ export const Form: React.FC<FormProps> = ({ fields, schema, label, onSubmit }) =
                     }
                 })
             }
-            <Button label={label? label : "Submit"} type="submit"/>
+            <Button label={label? label : "Submit"} type="submit" variant="primary" fill="solid"/>
         </form>
     );
 }
