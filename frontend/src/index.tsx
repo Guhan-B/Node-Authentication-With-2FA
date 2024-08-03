@@ -1,13 +1,14 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
 
 import './index.css'
 
-import { RegisterPage } from './pages/Register';
-import { LoginPage } from './pages/Login';
+import { router } from './router';
+
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RegisterPage />
+    <RouterProvider router={router} />
   </React.StrictMode>,
 )

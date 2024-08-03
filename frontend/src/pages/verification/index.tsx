@@ -1,52 +1,48 @@
 import React from "react";
 import Joi from "joi";
-import { Link, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { FieldValues, UseFormSetError } from "react-hook-form";
 
 import { Form } from "../../components/form";
 import { ClientError } from "../../api";
-import { loginGenerateCodeRequest } from "../../api/authentication";
+import { loginVerifyCodeRequest } from "../../api/authentication";
 
 import styles from "./styles.module.css";
 
 
-export const LoginPage = () => {
+export const VerificationPage = () => {
     const fields = [
-        { type: "text", label: "Email", name: "email" },
-        { type: "password", label: "Password", name: "password" },
+        { type: "code", label: "Enter Your Access Code", name: "code" },
     ]
-
+    
     const schema = Joi.object({
-        email: Joi.string().email({ tlds: { allow: false } }).required().messages({
-            "string.empty": "Enter your email address",
-            "string.email": "Email provided is not valid"
+        code: Joi.number().min(1000).max(9999).messages({
+            "number.base" : "Please enter the your access code",
+            "number.min" : "Access code must be 4 digits",
+            "number.max" : "Access code must be 4 digits"
         }),
-        password: Joi.string().min(8).max(16).required().messages({
-            "string.empty": "Password cannot be empty",
-            "string.min": "Password should be 8 to 16 characters long",
-            "string.max": "Password should be 8 to 16 characters long"
-        })
     });
     
     const [isLoading, setIsLoading] = React.useState(false);
-
+    
     const navigate = useNavigate();
-
+    
+    const location = useLocation();
+    
     const onSubmit = async (data: FieldValues, setError: UseFormSetError<FieldValues>) => {
         setIsLoading(true);
 
         try {
-            await loginGenerateCodeRequest({
-                email: data.email,
-                password: data.password
+            await loginVerifyCodeRequest({
+                code: data.code
             });
 
-            navigate("/authentication/verify", {
-                state: {
-                    email: data.email,
-                    password: data.password
-                }
-            });
+            // navigate("/dashboard", {
+            //     state: {
+            //         email: data.email,
+            //         password: data.password
+            //     }
+            // });
         }
         catch(error) {
             const clientError = error as ClientError;
@@ -67,11 +63,22 @@ export const LoginPage = () => {
                 else {
                     // Show a form level error message (or) Show a toast message
                     console.log(clientError.error.message);
+                    console.log(clientError.error.details);
                 }
             }
         }
 
         setIsLoading(false);
+    }
+
+    const onResend = () => {
+        
+    }
+
+    if (!location.state || !location.state.email || !location.state.password) {
+        return (
+            <Navigate to="/authentication/login" replace />
+        );
     }
 
     return (
@@ -80,12 +87,12 @@ export const LoginPage = () => {
             <section className={styles.right}>
                 <div className={styles.content}>
                     <header>
-                        <h2>Log In & Continue Your Learning Journey</h2>
+                        <h2>Let's Get You Verified</h2>
+                        <p>Enter the access code sent to your email <span>{location.state.email}</span> to access your account</p>
                     </header>
-                    <Form fields={fields} schema={schema} label="Log In" onSubmit={onSubmit} loading={isLoading}/>
+                    <Form fields={fields} schema={schema} label="Continue" onSubmit={onSubmit} loading={isLoading}/>
                     <footer>
-                        <span>Don't have an account? <Link to="/authentication/register">Register</Link></span>
-                        <span><Link to="/authentication/reset-password">Forgot Password</Link></span>
+                        <span>Didn't recieve the access code? <button>Resend</button></span>
                     </footer>
                 </div>
             </section>

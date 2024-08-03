@@ -1,32 +1,78 @@
 .wrapper {
     font-size: 1rem;
     font-weight: 800;
-    padding: 1rem;
-    border: .2rem solid var(--color-light);
+    padding: 0 1rem;
     outline: none;
     cursor: pointer;
-    color: var(--color-dark);
-    background-color: var(--color-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    height: 60px;
 }
 
-.wrapper:hover, .wrapper:focus-visible   {
-    transition: all 0.05s ease-in-out;
-    background-color: var(--color-light-hover);
+.wrapper:disabled {
+    cursor: not-allowed;
 }
 
-.wrapper.primary {
+/* Primary Button CSS */
+.wrapper.primary.solid {
+    background-color: var(--color-primary);
+    border: .15rem solid var(--color-primary);
+}
+
+.wrapper.primary.solid span {
     color: var(--color-light);
 }
 
-.wrapper.primary.solid {
-    background-color: var(--color-primary);
-}
-
 .wrapper.primary.outline {
-    background-color: var(--color-primary);
+    background-color: transparent;
+    border: .15rem solid var(--color-primary);
 }
 
-.wrapper:hover.primary, .wrapper.primary:focus-visible  {
+.wrapper.primary.outline span {
+    color: var(--color-primary);
+}
+
+.wrapper:hover.primary.solid, .wrapper.primary.solid:focus-visible  {
     transition: all 0.05s ease-in-out;
     background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+.wrapper:hover.primary.outline, .wrapper.primary.outline:focus-visible  {
+    transition: all 0.05s ease-in-out;
+    background-color: var(--color-light-hover);
+    border-color: var(--color-primary-hover);
+}
+
+/* Dark Button CSS */
+.wrapper.dark.solid {
+    background-color: var(--color-dark);
+    border: .15rem solid var(--color-dark);
+}
+
+.wrapper.dark.solid span {
+    color: var(--color-light);
+}
+
+.wrapper.dark.outline {
+    background-color: transparent;
+    border: .15rem solid var(--color-dark);
+}
+
+.wrapper.dark.outline span {
+    color: var(--color-dark);
+}
+
+.wrapper:hover.dark.solid, .wrapper.dark.solid:focus-visible  {
+    transition: all 0.05s ease-in-out;
+    background-color: var(--color-dark-hover);
+    border-color: var(--color-dark-hover);
+}
+
+.wrapper:hover.dark.outline, .wrapper.dark.outline:focus-visible  {
+    transition: all 0.05s ease-in-out;
+    background-color: var(--color-light-hover);
+    border-color: var(--color-dark-hover);
 }

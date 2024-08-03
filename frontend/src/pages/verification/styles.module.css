@@ -27,12 +27,26 @@
     margin-bottom: 2rem;
 }
 
-.wrapper .right .content header h2 {    
+.wrapper .right .content header h2 {
     font-size: 2rem;
     font-weight: 800;
     text-align: center;
     line-height: 1.2;
     margin: 0 auto;
+    margin-bottom: 0.5rem;
+}
+
+.wrapper .right .content header p {
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: center;
+    line-height: 1.2;
+    margin: 0 auto;
+}
+
+.wrapper .right .content header p span {
+    text-decoration: underline dotted;
+    font-weight: 700;
 }
 
 .wrapper .content footer {
@@ -53,9 +67,12 @@
     border-bottom: none;
 }
 
-.wrapper .content span a {
+.wrapper .content span button {
     font-weight: 700;
     color: var(--color-primary);
     text-decoration: underline;
     cursor: pointer;
+    background: none;
+    border: none;
+    outline: none;
 }
