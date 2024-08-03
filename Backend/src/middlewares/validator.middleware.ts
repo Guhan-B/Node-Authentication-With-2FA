@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
 import Joi from "joi";
 
-import { ServerError } from "../utilities/error.js";
+import { ServerError, ErrorType } from "../utilities/error.js";
 import RequestSchemas from "../utilities/requestSchema.js";
 
 const handler = (): RequestHandler => (request, response, next) => {
@@ -15,8 +15,8 @@ const handler = (): RequestHandler => (request, response, next) => {
         if (validationResult.error === undefined) {
             next();
         } else {
-            const errors = validationResult.error.details.map((detail) => ({
-                cause: detail.path.join("."),
+            const errors: ErrorType[] = validationResult.error.details.map((detail) => ({
+                field: detail.path.join("."),
                 message: detail.message
             }));
 

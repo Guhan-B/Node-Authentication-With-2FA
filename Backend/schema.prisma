@@ -1,0 +1,36 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_CONNECTION")
+}
+
+model user {
+  id         String @id @unique(map: "id") @db.VarChar(32)
+  name       String @db.VarChar(128)
+  email      String @unique(map: "email") @db.VarChar(256)
+  password   String @db.VarChar(256)
+  created_at String @db.VarChar(32)
+}
+
+model session {
+  id         String @id @unique(map: "id") @db.VarChar(32)
+  user_id    String @db.VarChar(64)
+  token      String @unique(map: "token") @db.VarChar(256)
+  created_at String @db.VarChar(32)
+
+  @@index([user_id], map: "fk_session_user")
+}
+
+model verification {
+  id         String @id @unique(map: "id") @db.VarChar(32)
+  user_id    String @db.VarChar(32)
+  code       Int
+  token      String @unique(map: "token") @db.VarChar(256)
+  created_at String @db.VarChar(32)
+
+  @@index([user_id], map: "fk_verification_user")
+}

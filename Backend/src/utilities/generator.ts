@@ -1,81 +1,48 @@
 import jwt from "jsonwebtoken";
-import crypto from "node:crypto";
 import { nanoid } from "nanoid";
-import { jwtDecode, InvalidTokenError } from "jwt-decode";
 
 import { ServerError } from "../utilities/error.js";
-import prisma from "../utilities/prisma.js";
+
 
 const { JsonWebTokenError, TokenExpiredError } = jwt;
 
 export class Code {
-    public static async generate(
-        uid: string,
-        expiresIn: string
-    ): Promise<{ tid: string; token: string; code: number }> {
+    public static async generate(uid: string, expiresIn: string): Promise<{ token: string; code: number }> {
         const code = Math.floor(Math.random() * (9999 - 1000) + 1000);
-
-        const { payload, token, tokenHash } = await Token.generate(uid, expiresIn, "Verification-Token");
-
-        await prisma.verification.create({
-            data: {
-                id: payload.tid,
-                user_id: uid,
-                token: tokenHash,
-                code: code,
-                created_at: payload.createdAt
-            }
-        });
-
-        return {
-            tid: payload.tid,
-            code: code,
-            token: token
-        };
+        const token = await Token.generate(uid, `${process.env.TOKEN_SECRET}.${uid}.${code}`, expiresIn);
+        return { token, code };
     }
 
     public static async verify(code: number, token: string): Promise<string> {
         try {
-            const payload: CustomJwtPayload = await Token.verify(token);
+            const payload = jwt.decode(token, { json: true });
 
-            const verification = await prisma.verification.findUnique({
-                where: { id: payload.tid, user_id: payload.uid }
-            });
-
-            if (!verification || crypto.createHash("sha256").update(token).digest("hex") !== verification.token) {
-                throw ServerError.AuthenticationError([
-                    { cause: "Invalid Verification Token", message: "Unable to verify code. Please try again" }
-                ]);
+            if (payload && payload.uid) {
+                await Token.verify(token, `${process.env.TOKEN_SECRET}.${payload.uid}.${code}`);
             }
-
-            if (code !== verification.code) {
-                throw ServerError.AuthenticationError([
-                    {
-                        cause: "Incorrect Verification Code",
-                        message: "The verification code entered is incorrect. Please try again"
-                    }
-                ]);
+            else {
+                throw ServerError.AuthenticationError({ 
+                    message: "Unable to verify code. Please try again",
+                    details: "User ID missing from verification token payload. Cannot validate the verification code without user ID"
+                });
             }
-
-            await prisma.verification.delete({
-                where: {
-                    id: payload.tid,
-                    user_id: payload.uid
-                }
-            });
-
+            
             return payload.uid;
         } catch (e) {
-            if (e instanceof InvalidTokenError || e instanceof JsonWebTokenError) {
-                e = ServerError.AuthenticationError([
-                    { cause: "Invalid Verification Token", message: "Unable to verify code. Please try again" }
-                ]);
+            if (e instanceof JsonWebTokenError) {
+                e = ServerError.AuthenticationError({ 
+                    field: "code", 
+                    message: "The verification code entered is incorrect" ,
+                    details: "Verification code provided does not match the generated verification code"
+                });
             }
 
             if (e instanceof TokenExpiredError) {
-                e = ServerError.AuthenticationError([
-                    { cause: "Expired Verification Code", message: "The verification code entered is expired" }
-                ]);
+                e = ServerError.AuthenticationError({ 
+                    field: "code", 
+                    message: "The verification code entered is expired",
+                    details: "Verification token associated with the code has expired. Cannot validate the verification code"
+                });
             }
 
             throw e;
@@ -84,38 +51,22 @@ export class Code {
 }
 
 export class Token {
-    public static async generate(
-        uid: string,
-        expiresIn: string,
-        type: string
-    ): Promise<{ payload: CustomJwtPayload; token: string; tokenHash: string }> {
-        const payload: CustomJwtPayload = {
-            tid: nanoid(),
-            uid: uid,
-            createdAt: new Date().toISOString()
-        };
-
-        const token = jwt.sign(payload, process.env.TOKEN_SECRET_KEY as string, {
-            expiresIn: expiresIn,
+    public static async generate(uid: string, secret: string, expiresIn: string): Promise<string> {
+        const token = jwt.sign({ uid }, secret as string, {
+            jwtid: nanoid(),            
             algorithm: "HS256",
-            issuer: "JustLoop",
-            header: {
-                typ: type,
-                alg: "HS256"
-            }
+            issuer: "justloop.xyz",
+            audience: "client",
+            expiresIn: expiresIn,
         });
 
-        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-        return { payload, token, tokenHash };
+        return token;
     }
 
-    public static async verify(token: string): Promise<CustomJwtPayload> {
+    public static async verify(token: string, secret: string): Promise<void> {
         try {
-            jwt.verify(token, process.env.TOKEN_SECRET_KEY as string);
-            const payload: CustomJwtPayload = jwtDecode(token);
-            return payload;
-        } catch (e) {
+            jwt.verify(token, secret);
+        } catch (e) {            
             throw e;
         }
     }

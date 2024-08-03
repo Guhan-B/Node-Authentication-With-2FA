@@ -1,52 +1,59 @@
-import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
-import { jwtDecode, InvalidTokenError, JwtPayload } from "jwt-decode";
 import { RequestHandler } from "express";
 
 import prisma from "../utilities/prisma.js";
 import { ServerError } from "../utilities/error.js";
 import { Token } from "../utilities/generator.js";
 
+const { JsonWebTokenError, TokenExpiredError } = jwt;
+
 const handler = (): RequestHandler => async (request, response, next) => {
     try {
-        const tokenFromCookie: string = request.cookies["Access-Token"];
+        const accessToken: string = request.cookies["Access-Token"];
 
-        if (!tokenFromCookie) {
-            throw ServerError.AuthenticationError([
-                { cause: "Access token missing", message: "Authentication failed. Login to continue" }
-            ]);
+        if (!accessToken) {
+            throw ServerError.AuthenticationError({ 
+                message: "Authentication failed. Login to continue",
+                details: "Access token is missing from cookie. Access denied"
+            });
         }
 
-        const payload: CustomJwtPayload = await Token.verify(tokenFromCookie);
+        const payload = jwt.decode(accessToken, { json: true });
 
-        const user = await prisma.user.findUnique({
-            where: { id: payload.uid }
-        });
-
-        const session = await prisma.session.findUnique({
-            where: { id: payload.tid }
-        });
-
-        if (!user || !session) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-            ]);
+        if (payload == null || payload.uid == null) {
+            throw ServerError.AuthenticationError({ 
+                message: "Authentication failed. Login to continue" ,
+                details: "User ID missing from access token payload, cannot validate the access code without user ID. Access Denied"
+            });
         }
 
-        if (crypto.createHash("sha256").update(tokenFromCookie).digest("hex") !== session.token) {
-            throw ServerError.AuthenticationError([
-                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-            ]);
+        const user = await prisma.user.findUnique({ where: { id: payload.uid } });
+
+        if (!user) {
+            throw ServerError.AuthenticationError({ 
+                message: "Authentication failed. Login to continue",
+                details: "User ID from access token does not identifies a user, cannot verify code without user. Access Denied"
+            });
         }
+
+        await Token.verify(accessToken, `${process.env.TOKEN_SECRET}.${user.password}`);
 
         request.uid = user.id;
 
         next();
     } catch (e) {
-        if (e instanceof InvalidTokenError) {
-            e = ServerError.AuthenticationError([
-                { cause: "Invalid access token", message: "Authentication failed. Login to continue" }
-            ]);
+        if (e instanceof JsonWebTokenError) {
+            e = ServerError.AuthenticationError({ 
+                message: "Authentication failed. Login to continue",
+                details: "Validation of access token has failed. Access Denied"
+            });
+        }
+
+        if (e instanceof TokenExpiredError) {
+            e = ServerError.AuthenticationError({ 
+                message: "Your session has expired. Login to continue",
+                details: "Access token associated with the session has expired. Access Denied"
+            });
         }
 
         next(e);

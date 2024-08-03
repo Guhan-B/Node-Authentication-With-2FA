@@ -1,5 +1,4 @@
 import bcrypt from "bcrypt";
-import crypto from "node:crypto";
 import { nanoid } from "nanoid";
 import { RequestHandler } from "express";
 
@@ -8,20 +7,22 @@ import mailer from "../utilities/mailer.js";
 import { ServerError } from "../utilities/error.js";
 import { Code, Token } from "../utilities/generator.js";
 
+
 const register: RequestHandler = async (request, response, next) => {
-    console.log("HERE");
     try {
         const user = await prisma.user.findUnique({
             where: { email: request.body.email }
         });
 
         if (user) {
-            throw ServerError.ValidationError([
-                { cause: "Email", message: "An account with given email already exists" }
-            ]);
+            throw ServerError.ValidationError({ 
+                field: "email", 
+                message: "Email already in use", 
+                details: "An account with given email already exist. Multiple accounts cannot have same email" 
+            });
         }
 
-        const hash: string = await bcrypt.hash(request.body.password, 16);
+        const hash = await bcrypt.hash(request.body.password, 16);
 
         await prisma.user.create({
             data: {
@@ -29,7 +30,6 @@ const register: RequestHandler = async (request, response, next) => {
                 name: request.body.name,
                 email: request.body.email,
                 password: hash,
-                avatar: request.body.avatar,
                 created_at: new Date().toUTCString()
             }
         });
@@ -47,18 +47,24 @@ const loginGenerateOTP: RequestHandler = async (request, response, next) => {
         });
 
         if (!user) {
-            throw ServerError.ValidationError([
-                { cause: "Email", message: "An account with given email does not exists" }
-            ]);
+            throw ServerError.ValidationError({ 
+                field: "email", 
+                message: "Email is not registered",
+                details: "An account with given email does not exist. Email must be registed to an account to login" 
+            });
         }
 
         const isPasswordSame = await bcrypt.compare(request.body.password, user.password);
 
         if (!isPasswordSame) {
-            throw ServerError.ValidationError([{ cause: "Password", message: "Password is incorrect" }]);
+            throw ServerError.ValidationError({ 
+                field: "password", 
+                message: "Password is incorrect",
+                details: "Password provided does not match with account password"
+            });
         }
 
-        const { tid, code, token } = await Code.generate(user.id, "5m");
+        const { token, code } = await Code.generate(user.id, "5m");
 
         const mailerResponse = await mailer.emails.send({
             from: "no-reply@justloop.xyz",
@@ -76,13 +82,10 @@ const loginGenerateOTP: RequestHandler = async (request, response, next) => {
         });
 
         if (mailerResponse.error) {
-            await prisma.verification.delete({
-                where: { id: tid }
+            throw ServerError.InternalServerError({ 
+                message: "Unable to generate OTP. Please try again",
+                details: "Unable to send mail to the account email. Mailing failed due to error from Resend" 
             });
-
-            throw ServerError.InternalServerError([
-                { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
-            ]);
         }
 
         response
@@ -97,30 +100,30 @@ const loginGenerateOTP: RequestHandler = async (request, response, next) => {
 
 const loginVerifyOTP: RequestHandler = async (request, response, next) => {
     try {
-        const tokenFromCookie: string = request.cookies["Verification-Token"];
+        const verificationToken: string = request.cookies["Verification-Token"];
 
-        if (!tokenFromCookie) {
-            throw ServerError.AuthenticationError([
-                { cause: "Verification Token Missing", message: "Unable to verify code. Please try again" }
-            ]);
+        if (!verificationToken) {
+            throw ServerError.AuthenticationError({  
+                message: "Unable to verify code. Please try again",
+                details: "Verification token is missing from cookie. Cannot verify code without verification token"
+            });
         }
 
-        const uid = await Code.verify(Number.parseInt(request.body.code), tokenFromCookie);
+        const user_id = await Code.verify(Number.parseInt(request.body.code), verificationToken);
+        const user = await prisma.user.findUnique({ where: { id: user_id } });
 
-        const { payload, token, tokenHash } = await Token.generate(uid, "7d", "Access-Token");
+        if (!user) {
+            throw ServerError.AuthenticationError({ 
+                message: "Unable to verify code. Please try again",
+                details: "User ID from verification token does not identifies a user. Cannot verify code without user" 
+            });
+        }
 
-        await prisma.session.create({
-            data: {
-                id: payload.tid,
-                user_id: uid,
-                token: tokenHash,
-                created_at: payload.createdAt
-            }
-        });
+        const accessToken = await Token.generate(user.id, `${process.env.TOKEN_SECRET}.${user.password}` ,"7d");
 
         response
             .clearCookie("Verification-Token")
-            .cookie("Access-Token", token, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: true, secure: false })
+            .cookie("Access-Token", accessToken, { maxAge: 7 * 24 * 60 * 60 * 1000, httpOnly: true, secure: false })
             .status(201)
             .json();
     } catch (e) {
@@ -130,12 +133,10 @@ const loginVerifyOTP: RequestHandler = async (request, response, next) => {
 
 const logout: RequestHandler = async (request, response, next) => {
     try {
-        const tokenFromCookie = request.cookies["Access-Token"] as string;
-        const tokenHashFromCookie = crypto.createHash("sha256").update(tokenFromCookie).digest("hex");
-
-        await prisma.session.delete({ where: { user_id: request.uid, token: tokenHashFromCookie } });
-
-        response.clearCookie("Access-Token").status(201).json();
+        response
+            .clearCookie("Access-Token")
+            .status(200)
+            .json();
     } catch (e) {
         return next(e);
     }
@@ -148,12 +149,14 @@ const changePasswordGenerateOTP: RequestHandler = async (request, response, next
         });
 
         if (!user) {
-            throw ServerError.ValidationError([
-                { cause: "Email", message: "An account with given email does not exists" }
-            ]);
+            throw ServerError.ValidationError({ 
+                field: "email", 
+                message: "Email is not registered",
+                details: "An account with given email does not exist. Email must be registed to an account to change password" 
+            });
         }
 
-        const { tid, token, code } = await Code.generate(user.id, "5m");
+        const { token, code } = await Code.generate(user.id, "5m");
 
         const mailerResponse = await mailer.emails.send({
             from: "no-reply@justloop.xyz",
@@ -171,13 +174,10 @@ const changePasswordGenerateOTP: RequestHandler = async (request, response, next
         });
 
         if (mailerResponse.error) {
-            await prisma.verification.delete({
-                where: { id: tid }
+            throw ServerError.InternalServerError({ 
+                message: "Unable to generate OTP. Please try again",
+                details: "Unable to send mail to the account email. Mailing failed due to error from Resend" 
             });
-
-            throw ServerError.InternalServerError([
-                { cause: "Mailing Failed", message: "Unable to generate OTP. Please try again" }
-            ]);
         }
 
         response
@@ -192,28 +192,29 @@ const changePasswordGenerateOTP: RequestHandler = async (request, response, next
 
 const changePasswordVerifyOTP: RequestHandler = async (request, response, next) => {
     try {
-        const tokenFromCookie: string = request.cookies["Verification-Token"];
+        const verificationToken: string = request.cookies["Verification-Token"];
 
-        if (!tokenFromCookie) {
-            throw ServerError.AuthenticationError([
-                { cause: "Verification Token Missing", message: "Unable to verify code. Please try again" }
-            ]);
+        if (!verificationToken) {
+            throw ServerError.AuthenticationError({  
+                message: "Unable to verify code. Please try again",
+                details: "Verification token is missing from cookie. Cannot verify code without verification token"
+            });
         }
 
-        const uid = await Code.verify(Number.parseInt(request.body.code), tokenFromCookie);
+        const user_id = await Code.verify(Number.parseInt(request.body.code), verificationToken);
 
         const hash: string = await bcrypt.hash(request.body.password, 16);
 
         await prisma.user.update({
             data: { password: hash },
-            where: { id: uid }
+            where: { id: user_id }
         });
 
-        await prisma.session.deleteMany({
-            where: { user_id: uid }
-        });
-
-        response.clearCookie("Verification-Token").clearCookie("Access-Token").status(201).json();
+        response
+            .clearCookie("Verification-Token")
+            .clearCookie("Access-Token")
+            .status(201)
+            .json();
     } catch (e) {
         return next(e);
     }

@@ -2,7 +2,9 @@ node_modules
 build
 README.md
 .env
-.docker.env
 .dockerignore
 .git
 .gitignore
+.prettierrc.json
+.eslintrc.cjs
+.eslintignore

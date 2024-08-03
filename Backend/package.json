@@ -1,16 +1,14 @@
 {
     "name": "project-coin-backend",
     "version": "1.0.0",
-    "description": "This prpject implements a complete authentication setup for REST APIs",
+    "description": "This project implements a complete authentication setup for REST APIs",
     "main": "build/index.js",
     "type": "module",
     "scripts": {
         "start": "node .",
-        "compile": "npx tsc --project .",
         "build": "npx tsc --build --verbose",
         "clean-build": "npx tsc --build --clean --verbose",
-        "serve": "concurrently \"npx tsc --watch\" \"npx nodemon build/index.js\"",
-        "prisma-sync": "npx prisma db pull && npx prisma generate",
+        "dev": "concurrently \"npx tsc --watch\" \"npx nodemon build/index.js\"",
         "prettier": "prettier --write --list-different .",
         "lint": "eslint . --max-warnings 0",
         "lint:fix": "npm run lint -- --fix"

@@ -19,15 +19,14 @@ declare global {
     }
 
     type CustomJwtPayload = JwtPayload & {
-        tid: string;
         uid: string;
-        createdAt: string;
     };
 }
 
 const server = () => {
     const app: Express = express();
 
+    app.use(cors({ origin: ["http://localhost:8000"]  }));
     app.use(helmet());
     app.use(express.json());
     app.use(express.urlencoded({ extended: false }));
@@ -36,8 +35,8 @@ const server = () => {
     app.use("/", router);
     app.use(errorHandler());
 
-    const serverHost = "0.0.0.0";
-    const serverPort = 80;
+    const serverHost = process.env.HOST || "0.0.0.0";
+    const serverPort = Number.parseInt(process.env.PORT || "80");
 
     app.listen(serverPort, serverHost, () => {
         logger.info(`Server is started and is running on port ${serverHost}:${serverPort}`);
